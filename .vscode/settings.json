@@ -1,0 +1,6 @@
+{
+    // Arquivos .m sao abertos como Octave/MATLAB (e nao como Objective-C)
+    "files.associations": {
+        "*.m": "octave"
+    }
+}

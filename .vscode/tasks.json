@@ -1,0 +1,19 @@
+{
+    // Atalho Ctrl+Shift+B: roda no GNU Octave o arquivo .m que estiver aberto.
+    // O Octave e executado dentro da pasta do arquivo (para achar as funcoes
+    // auxiliares) e sem interface grafica (--no-gui); as figuras sao salvas
+    // em PNG pelo proprio script.
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Rodar no Octave",
+            "type": "process",
+            "command": "C:\\Users\\081484321112\\AppData\\Local\\Programs\\GNU Octave\\Octave-11.3.0\\mingw64\\bin\\octave.exe",
+            "args": ["--no-gui", "--quiet", "--eval", "${fileBasenameNoExtension}"],
+            "options": { "cwd": "${fileDirname}" },
+            "group": { "kind": "build", "isDefault": true },
+            "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
+            "problemMatcher": []
+        }
+    ]
+}
