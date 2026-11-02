@@ -29,6 +29,7 @@ function [melhor, hist] = mlp_treinar(rede, Xtr, Ytr, Xva, Yva, p)
 
     L  = numel(rede.W);
     n  = size(Xtr, 1);
+    relu = isfield(rede, 'ativacao') && strcmp(rede.ativacao, 'relu');
 
     % Velocidades do momento (comecam em zero), uma por matriz de pesos.
     vW = cell(1, L);  vb = cell(1, L);
@@ -62,8 +63,15 @@ function [melhor, hist] = mlp_treinar(rede, Xtr, Ytr, Xva, Yva, p)
                 gW = A{l}' * delta / nb;        % gradiente medio dos pesos
                 gb = mean(delta, 1);            % gradiente medio do bias
                 if l > 1
-                    % delta da camada anterior (usa os pesos ANTES da atualizacao)
-                    delta_ant = (delta * rede.W{l}') .* A{l} .* (1 - A{l});
+                    % delta da camada anterior (usa os pesos ANTES da atualizacao),
+                    % vezes a derivada da ativacao oculta:
+                    %   sigmoide: a .* (1 - a)      ReLU: 1 se a > 0, senao 0
+                    if relu
+                        derivada = A{l} > 0;
+                    else
+                        derivada = A{l} .* (1 - A{l});
+                    end
+                    delta_ant = (delta * rede.W{l}') .* derivada;
                 end
                 vW{l} = p.momento * vW{l} - p.taxa * gW;
                 vb{l} = p.momento * vb{l} - p.taxa * gb;

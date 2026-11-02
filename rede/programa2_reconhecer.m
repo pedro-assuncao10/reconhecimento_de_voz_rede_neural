@@ -45,17 +45,17 @@ p.n_conf       = 1;      % janelas seguidas iguais para aceitar um trecho
                          % (com 2, a silaba do meio, que as vezes aparece
                          %  em uma janela so, era descartada)
 p.max_silencio = 0.300;  % silencio maximo tolerado no meio de uma palavra (s)
-fprintf('Rede: metodo %s | %d faixas | %s | ocultas [%s]\n\n', modelo.metodo, ...
-    modelo.n_bandas, modelo.normalizacao, num2str(modelo.ocultas));
+fprintf('Rede: metodo %s | %d faixas | %s | ocultas [%s] | %s | contexto [%s]\n\n', modelo.metodo, ...
+    modelo.n_bandas, modelo.normalizacao, num2str(modelo.ocultas), modelo.ativacao, num2str(modelo.contexto));
 
 % Descobre quais repeticoes sao de TESTE a partir dos arquivos de teste
 % guardados no modelo (ex.: 'di_005.wav' -> direita no 5; 'es_012.wav' ->
 % esquerda no 12; 'silencio_020.wav' -> silencio no 20).
 num_de = @(nome) str2double(regexprep(nome, '^.*_(\d+)\.wav$', '$1'));
 arqs = modelo.arquivos_teste;
-teste_dir = sort(cellfun(num_de, arqs(strncmp(arqs, 'di_', 3))));
-teste_esq = sort(cellfun(num_de, arqs(strncmp(arqs, 'es_', 3))));
-teste_sil = sort(cellfun(num_de, arqs(strncmp(arqs, 'silencio_', 9))));
+teste_dir = unique(cellfun(num_de, arqs(strncmp(arqs, 'di_', 3))));
+teste_esq = unique(cellfun(num_de, arqs(strncmp(arqs, 'es_', 3))));
+teste_sil = unique(cellfun(num_de, arqs(strncmp(arqs, 'silencio_', 9))));
 
 %% 2. PARTE 1 - CADA PALAVRA DE TESTE ISOLADA -----------------------------
 fprintf('=== PARTE 1: palavras de teste isoladas ===\n');
@@ -159,11 +159,20 @@ for j = 1:numel(rec)
         'HorizontalAlignment', 'center');
 end
 xlim([0 numel(fluxo) / fs]);
+% Legenda (pontos NaN so para criar as entradas da legenda)
+h1 = plot(NaN, NaN, 'Color', [0.5 0.5 0.5]);
+h2 = plot(NaN, NaN, 'v', 'Color', [0 0.6 0], 'MarkerFaceColor', [0 0.6 0]);
+h3 = plot(NaN, NaN, 'v', 'Color', [0.8 0 0], 'MarkerFaceColor', [0.8 0 0]);
+legend([h1 h2 h3], {'audio (texto em cima = palavra que foi dita)', ...
+    'palavra reconhecida durante uma palavra dita', ...
+    'falso alarme (reconhecida sem nada dito)'}, 'Location', 'eastoutside');
+xlabel('tempo (s)'); ylabel('amplitude');
 title('Fala continua: em cima, o que foi dito | embaixo (triangulos), o que o sistema reconheceu');
 subplot(2, 1, 2);
 stairs(reg.t, reg.classe, 'b'); xlim([0 numel(fluxo) / fs]); ylim([0.5 numel(modelo.classes) + 0.5]);
 set(gca, 'YTick', 1:numel(modelo.classes), 'YTickLabel', modelo.classes);
-xlabel('tempo (s)'); title('Resposta da rede em cada janela');
+xlabel('tempo (s)'); ylabel('classe');
+title('Resposta da rede em cada janela de 150 ms (a maquina de estados procura di>rei>ta ou es>quer>da)');
 saveas(fig, fullfile(pasta_result, 'programa2_fluxo.png')); close(fig);
 
 %% 4. PARTE 3 - ARQUIVO ESCOLHIDO (opcional) ------------------------------

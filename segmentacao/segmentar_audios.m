@@ -74,16 +74,32 @@ queda_apara   = 25;   % apara cada palavra onde a energia cai 25 dB abaixo do
 
 % --- Metodo B (vales de energia) ---
 regiao_corte1 = [0.15 0.50]; % 1o corte procurado entre 15% e 50% da palavra
-regiao_corte2 = [0.50 0.90]; % 2o corte procurado entre 50% e 90% da palavra
-prom_min      = 3;    % o vale precisa ter pelo menos 3 dB de profundidade;
-                      % se nao houver, usa o corte do metodo A (terco)
+regiao_corte2 = [0.45 0.95]; % 2o corte procurado entre 45% e 95% da palavra,
+                             % e sempre DEPOIS do 1o corte
+prom_min      = 0;    % profundidade minima do vale (dB). 0 = SEMPRE corta no
+                      % vale mais fundo da regiao, mesmo que raso; so usa
+                      % o corte de reserva se nao houver vale nenhum
 silaba_min    = 0.040;% nenhuma silaba pode ficar com menos de 40 ms; se os
                       % vales gerarem um pedaco menor, a palavra usa os tercos
+% 2o corte (rei|ta e quer|da): o vale e procurado numa curva de energia
+% SO de 1 a 5 kHz. Abaixo de ~600 Hz ha um zumbido de fundo constante que
+% "enchia" o vale do fechamento do /t/ e do /d/ na curva de 250-6000 Hz;
+% de 1 a 5 kHz (formantes da vogal) o fechamento fica um vale bem fundo.
+% O corte vai no INICIO do vale (fim da vogal "ei"/"er"), e nao no fundo,
+% para o fechamento da consoante ficar no "ta"/"da".
+% Excecao: no "direita" o corte vai no FUNDO do vale. Ouvindo os
+% trechos, no inicio do vale o "rei" ficava cortado cedo demais (o fim
+% do "ei" ia para o "ta").
+f_min_corte2  = 1000;
+f_max_corte2  = 5000;
+corte2_no_fundo = {'direita'};   % palavras com o 2o corte no fundo do vale
 
-% --- Ajuste fino das fronteiras (vale para os dois metodos) ---
+% --- Ajuste fino das fronteiras ---
 % Ouvindo os trechos, o "ta" e o "da" comecavam tarde demais (o fechamento
 % da boca do /t/ e do /d/ ficava no trecho anterior). Valores positivos
 % movem o corte para ANTES; negativos, para depois.
+% (O 2o corte do metodo B ja e posto no inicio do fechamento e nao usa
+%  adianta_corte2; ele so vale para os tercos e para o corte de reserva.)
 adianta_corte1 = 0.000; % fronteira di|rei e es|quer (s)
 adianta_corte2 = 0.030; % fronteira rei|ta e quer|da: 30 ms mais cedo (s)
 
@@ -159,6 +175,10 @@ for g = 1:numel(gravacoes)
     e = 10 * log10(sum(X(banda, :), 1) + 1e-10);   % vetor linha, 1 x nq
     e = movmean(e, n_suav);                        % suaviza a curva
 
+    % Curva so de 1-5 kHz, usada para o 2o corte (ver configuracao).
+    banda2 = (f >= f_min_corte2) & (f <= f_max_corte2);
+    e2 = movmean(10 * log10(sum(X(banda2, :), 1) + 1e-10), n_suav);
+
     % ---- 2.3 Deteccao das palavras -------------------------------------
     % Piso de ruido: ordena as energias e pega o valor no percentil 10%.
     v    = sort(e);
@@ -216,19 +236,32 @@ for g = 1:numel(gravacoes)
         % Metodo A: cortes em 1/3 e 2/3 da duracao.
         cA = a + round([1/3, 2/3] * L);
 
-        % Metodo B: procura o vale mais profundo em cada regiao.
-        [c1, p1] = vale_na_regiao(e, a, b, regiao_corte1);
-        [c2, p2] = vale_na_regiao(e, a, b, regiao_corte2);
-        reserva1 = isempty(c1) || p1 < prom_min;
-        reserva2 = isempty(c2) || p2 < prom_min;
-        if reserva1, c1 = cA(1); end          % sem vale claro: usa o terco
-        if reserva2, c2 = cA(2); end
-        cB = [c1, c2];
-
         % Ajuste fino das fronteiras (adianta_corte1/2, em quadros)
         ajuste = round([adianta_corte1, adianta_corte2] / dur_passo);
         cA = cA - ajuste;
-        cB = cB - ajuste;
+
+        % Metodo B, 1o corte: vale mais profundo na regiao.
+        [c1, p1] = vale_na_regiao(e, a, b, regiao_corte1);
+        reserva1 = isempty(c1) || p1 < prom_min;
+        if reserva1, c1 = cA(1); else, c1 = c1 - ajuste(1); end  % sem vale claro: terco
+
+        % Metodo B, 2o corte: curva de 1-5 kHz, corta no INICIO do vale
+        % (ou no FUNDO, nas palavras de 'corte2_no_fundo'), e
+        % so procura DEPOIS do 1o corte (+ silaba_min), para os dois cortes
+        % nunca cairem no mesmo vale e espremerem a silaba do meio.
+        % Sem vale claro, divide ao meio o que sobra depois do 1o corte (o
+        % terco poderia cair antes do 1o corte e descartar a palavra toda).
+        min_q = round(silaba_min / dur_passo);
+        regiao2 = [max(regiao_corte2(1), (c1 + min_q - a) / L), regiao_corte2(2)];
+        [c2_fundo, p2, c2] = vale_na_regiao(e2, a, b, regiao2);
+        if any(strcmp(palavra, corte2_no_fundo)), c2 = c2_fundo; end
+        reserva2 = isempty(c2) || p2 < prom_min;
+        if reserva2
+            c2 = round((c1 + b) / 2);
+        else
+            c2 = max(c2, c1 + min_q);          % (ja no inicio/fundo do vale)
+        end
+        cB = [c1, c2];
 
         % Protecao: os dois vales podem cair no mesmo ponto (ex.: ambos
         % exatamente em 50% da palavra), gerando uma silaba vazia. Se
@@ -277,7 +310,7 @@ for g = 1:numel(gravacoes)
                   'B_corte1_s;B_corte2_s;fim_s;B_cortes_em_reserva\n']);
     fprintf(fid, '%d;%.3f;%.3f;%.3f;%.3f;%.3f;%.3f;%d\n', tabela');
     fclose(fid);
-    fprintf('Cortes do metodo B que usaram o terco (sem vale claro): %d de %d\n', ...
+    fprintf('Cortes do metodo B sem nenhum vale (usaram o corte de reserva): %d de %d\n', ...
         sum(tabela(:, 8)), 2 * n_pal);
 
     % ---- 2.5 Amostras de silencio --------------------------------------
@@ -308,39 +341,90 @@ for g = 1:numel(gravacoes)
 
     % Figura 1: gravacao inteira com as palavras detectadas.
     fig = figure('Visible', 'off', 'Position', [0 0 1800 500]);
-    plot(t, e, 'b'); hold on;
-    yline(piso + limiar_baixo, 'k--', 'limiar');
+    h1 = plot(t, e, 'b'); hold on;
+    % (linhas feitas com plot: yline/xline nao existem no Octave antigo)
+    h2 = plot(t([1 end]), [1 1] * (piso + limiar_baixo), 'k--');
     for k = 1:n_pal
         xr = t(seg(k, :));
-        patch([xr(1) xr(2) xr(2) xr(1)], [min(e) min(e) max(e) max(e)], ...
+        h3 = patch([xr(1) xr(2) xr(2) xr(1)], [min(e) min(e) max(e) max(e)], ...
               'g', 'FaceAlpha', 0.2, 'EdgeColor', 'none');
     end
     xlabel('tempo (s)'); ylabel('energia 250-6000 Hz (dB)');
-    title(sprintf('"%s": %d palavras detectadas (verde)', palavra, n_pal));
+    title(sprintf('"%s": %d palavras detectadas', palavra, n_pal));
+    legend([h1 h2 h3], {'energia do som (250-6000 Hz)', ...
+        sprintf('limiar: acima disso e som (piso + %d dB)', limiar_baixo), ...
+        'palavra detectada'}, 'Location', 'southoutside', 'Orientation', 'horizontal');
     saveas(fig, fullfile(pasta_saida, 'figuras', sprintf('%s_deteccao.png', palavra)));
     close(fig);
 
-    % Figura 2: 12 palavras espalhadas, com os cortes A (verde tracejado)
-    % e B (vermelho) sobre a curva de energia.
-    fig = figure('Visible', 'off', 'Position', [0 0 1800 800]);
+    % Cada palavra tem 4 linhas verticais de cada metodo: inicio, corte 1,
+    % corte 2 e fim. Os 2 cortes dividem a palavra nas 3 silabas. (O
+    % silencio nao e cortado da palavra: vem das pausas ENTRE as palavras.)
+
+    % Figura 2: 12 palavras espalhadas, com os cortes A e B sobre as
+    % curvas de energia.
+    fig = figure('Visible', 'off', 'Position', [0 0 1800 900]);
     amostra = round(linspace(1, n_pal, 12));
     for i = 1:12
         k = amostra(i);
         a = seg(k, 1); b = seg(k, 2);
         janela = max(1, a - 15) : min(nq, b + 15);
         subplot(3, 4, i);
-        plot(t(janela), e(janela), 'b'); hold on;
-        xline(t(a), 'k'); xline(t(b), 'k');
-        xline(tabela(k, 3), 'g--'); xline(tabela(k, 4), 'g--');
-        xline(tabela(k, 5), 'r');   xline(tabela(k, 6), 'r');
-        title(sprintf('%s #%d', palavra, k));
+        h1 = plot(t(janela), e(janela), 'b'); hold on;
+        h2 = plot(t(janela), e2(janela), 'm');
+        yl = ylim;  vline = @(x, estilo) plot([x x], yl, estilo, 'LineWidth', 1.5);
+        h3 = vline(t(a), 'k'); vline(t(b), 'k');
+        h4 = vline(tabela(k, 3), 'g--'); vline(tabela(k, 4), 'g--');
+        h5 = vline(tabela(k, 5), 'r');   vline(tabela(k, 6), 'r');
+        title(sprintf('%s #%d', palavra, k)); xlabel('tempo (s)'); ylabel('dB');
     end
-    % Titulo geral da figura (annotation funciona no MATLAB e no Octave;
+    % Titulo e legenda gerais (annotation funciona no MATLAB e no Octave;
     % o sgtitle nao existe no Octave).
     annotation('textbox', [0 0.96 1 0.04], 'String', ...
-        sprintf('"%s": cortes A (verde tracejado) x B (vermelho)', palavra), ...
+        sprintf('"%s": onde cada metodo corta as silabas %s | %s | %s', ...
+        palavra, silabas{:}), ...
         'HorizontalAlignment', 'center', 'EdgeColor', 'none', 'FontWeight', 'bold');
+    lg = legend([h1 h2 h3 h4 h5], {'energia 250-6000 Hz (usada no corte 1)', ...
+        'energia 1-5 kHz (usada no corte 2)', 'inicio / fim da palavra', ...
+        'metodo A (tercos): corte 1 e corte 2', 'metodo B (energia): corte 1 e corte 2'}, ...
+        'Orientation', 'horizontal');
+    set(lg, 'Position', [0.15 0.01 0.7 0.03]);
     saveas(fig, fullfile(pasta_saida, 'figuras', sprintf('%s_cortes.png', palavra)));
+    close(fig);
+
+    % Figura 3: a ONDA (o sinal de audio) de 6 palavras, com os cortes do
+    % metodo B e o nome de cada silaba. Os vales sao onde a onda "afina".
+    fig = figure('Visible', 'off', 'Position', [0 0 1800 900]);
+    amostra = round(linspace(1, n_pal, 6));
+    for i = 1:6
+        k = amostra(i);
+        s_a = round(tabela(k, 2) * fs);  s_b = round(tabela(k, 7) * fs);
+        s0 = max(1, s_a - round(0.08 * fs));  s1 = min(numel(x), s_b + round(0.08 * fs));
+        tt = (s0:s1) / fs;  onda = x(s0:s1);  amp = max(abs(onda));
+        subplot(3, 2, i);
+        h1 = plot(tt, onda, 'Color', [0.55 0.55 0.55]); hold on;
+        % envoltoria: amplitude media em janelas de 10 ms (contorno da onda)
+        env = sqrt(movmean(onda.^2, round(0.010 * fs)));
+        h2 = plot(tt, env * amp / max(env), 'b', 'LineWidth', 1.2);
+        vline = @(x, estilo) plot([x x], [-1 1] * amp, estilo, 'LineWidth', 2);
+        h3 = vline(tabela(k, 2), 'k'); vline(tabela(k, 7), 'k');
+        h4 = vline(tabela(k, 5), 'r'); vline(tabela(k, 6), 'r');
+        lim = tabela(k, [2 5 6 7]);
+        for s = 1:3
+            text(mean(lim(s:s+1)), -0.85 * amp, silabas{s}, 'HorizontalAlignment', ...
+                'center', 'FontWeight', 'bold', 'FontSize', 12, 'Color', [0.7 0 0]);
+        end
+        xlim(tt([1 end])); ylim([-1 1] * amp);
+        title(sprintf('%s #%d', palavra, k)); xlabel('tempo (s)'); ylabel('amplitude');
+    end
+    annotation('textbox', [0 0.96 1 0.04], 'String', ...
+        sprintf('"%s": onda do audio e cortes do metodo B (energia)', palavra), ...
+        'HorizontalAlignment', 'center', 'EdgeColor', 'none', 'FontWeight', 'bold');
+    lg = legend([h1 h2 h3 h4], {'onda (sinal de audio)', 'contorno da onda (amplitude)', ...
+        'inicio / fim da palavra', 'corte 1 e corte 2 (metodo B)'}, ...
+        'Orientation', 'horizontal');
+    set(lg, 'Position', [0.2 0.01 0.6 0.03]);
+    saveas(fig, fullfile(pasta_saida, 'figuras', sprintf('%s_ondas.png', palavra)));
     close(fig);
 end
 

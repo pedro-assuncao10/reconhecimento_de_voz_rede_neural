@@ -15,11 +15,17 @@ function A = mlp_propagar(rede, X)
     %          retropropagacao precisa delas.
 
     L = numel(rede.W);          % numero de camadas com pesos
+    relu = isfield(rede, 'ativacao') && strcmp(rede.ativacao, 'relu');
     A = cell(1, L + 1);
     A{1} = X;
     for l = 1:L
         % A{l} (n x in) * W{l} (in x out) = (n x out); o bias (1 x out)
         % e somado a todas as linhas (expansao automatica).
-        A{l + 1} = sigmoide(A{l} * rede.W{l} + rede.b{l});
+        Z = A{l} * rede.W{l} + rede.b{l};
+        if relu && l < L
+            A{l + 1} = max(Z, 0);          % ReLU nas camadas ocultas
+        else
+            A{l + 1} = sigmoide(Z);        % sigmoide (sempre na saida)
+        end
     end
 end

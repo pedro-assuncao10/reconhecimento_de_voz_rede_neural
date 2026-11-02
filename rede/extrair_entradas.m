@@ -3,8 +3,8 @@
 %  ------------------------------------------------------------------------
 %  Transforma o audio nos vetores de entrada da rede: amplitudes das
 %  frequencias (FFT), agrupadas em faixas de 0 a 5 kHz (espectro_bandas.m).
-%  Tambem sorteia quais amostras vao para treino (70%), teste (20%) e
-%  validacao (10%).
+%  Tambem sorteia quais amostras vao para treino (60%), teste (20%) e
+%  validacao (20%).
 %
 %  DOIS MODOS de gerar as amostras (variavel 'modo'):
 %    'trechos' - cada silaba recortada inteira vira UMA amostra.
@@ -16,13 +16,16 @@
 %                muito mais exemplos. O silencio tambem e percorrido por
 %                janelas.
 %
-%  Gera um arquivo por combinacao (metodo de corte x numero de faixas):
-%    entradas/entradas_<metodo>_<faixas>.mat, contendo:
-%    X        - matriz n x B: amplitudes por faixa (SEM normalizar)
+%  Gera um arquivo por combinacao (metodo de corte x faixas x contexto):
+%    entradas/entradas_<metodo>_<faixas>.mat           (sem contexto)
+%    entradas/entradas_<metodo>_<faixas>_contexto.mat  (com janelas vizinhas)
+%  contendo:
+%    X        - matriz n x (B * numero de janelas de contexto): amplitudes por faixa
+%               da janela atual e das vizinhas (SEM normalizar)
 %    y        - classe de cada amostra (1..7, na ordem de 'classes')
 %    conj     - conjunto de cada amostra: 1 = treino, 2 = teste, 3 = validacao
 %    arquivos - origem de cada amostra, no formato '<silaba>_<repeticao>.wav'
-%    classes, f_min, f_max, n_bandas, fs, modo, janela, passo
+%    classes, f_min, f_max, n_bandas, fs, modo, janela, passo, contexto
 %
 %  IMPORTANTE - divisao por PALAVRA, e nao por amostra:
 %  tudo que vem de uma mesma repeticao (as 3 silabas, ou todas as janelas
@@ -46,7 +49,13 @@ modo         = 'janelas';                      % 'janelas' ou 'trechos'
 janela       = 0.150;                          % duracao da janela (s) - modo 'janelas'
 passo        = 0.025;                          % passo da janela (s)   - modo 'janelas'
                                                % (o programa 2 usa estes mesmos valores)
-metodos      = {'tercos', 'energia'};          % os dois metodos de corte
+contextos    = {[0], [-4 -2 0 2 4]};           % janelas vizinhas na entrada, em passos:
+                                               %   [0]            = so a janela atual
+                                               %   [-4 -2 0 2 4]  = atual + 50/100 ms antes e depois
+                                               % Gera um arquivo para cada opcao (ver
+                                               % espectro_contexto.m). Modo 'janelas'.
+metodos      = {'energia'};                    % metodo de corte usado (opcoes:
+                                               % 'tercos', 'energia')
 palavras     = {'direita', 'esquerda'};
 silabas      = {{'di', 'rei', 'ta'}, {'es', 'quer', 'da'}};
 classes      = {'di', 'rei', 'ta', 'es', 'quer', 'da', 'silencio'};
@@ -54,7 +63,7 @@ grupo_classe = [1 1 1 2 2 2 3];                % 1 = direita, 2 = esquerda, 3 = 
 lista_bandas = [32 64];                        % numeros de faixas a testar
 f_min = 0;                                     % faixa de frequencia usada:
 f_max = 5000;                                  % 0 a 5 kHz (decisao do projeto)
-fracoes = [0.70 0.20 0.10];                    % treino, teste, validacao
+fracoes = [0.60 0.20 0.20];                    % treino, teste, validacao
 
 rng(42);   % semente fixa: o sorteio sai igual toda vez que rodar
 
@@ -66,7 +75,7 @@ for g = 1:3
     n_grupo(g) = numel(dir(fullfile(pasta_trechos, 'tercos', classes{c}, '*.wav')));
 end
 
-% Para cada grupo, embaralha os numeros das repeticoes e reparte 70/20/10.
+% Para cada grupo, embaralha os numeros das repeticoes e reparte 60/20/20.
 conj_grupo = cell(1, 3);
 for g = 1:3
     n  = n_grupo(g);
@@ -97,7 +106,9 @@ end
 
 %% 3. EXTRACAO DAS ENTRADAS ------------------------------------------------
 for m = 1:numel(metodos)
-    for nb = lista_bandas
+  for nb = lista_bandas
+    for ic = 1:numel(contextos)
+        contexto = contextos{ic};
         X = []; y = []; conj = []; arquivos = {};
 
         if strcmp(modo, 'trechos')
@@ -134,7 +145,7 @@ for m = 1:numel(metodos)
                         % Rotulo = silaba onde cai o CENTRO da janela
                         t = ct / fs;
                         if t < c1, s = 1; elseif t < c2, s = 2; else, s = 3; end
-                        X(end+1, :) = espectro_bandas(xw(a : a + J - 1), fs, nb, f_min, f_max); %#ok<SAGROW>
+                        X(end+1, :) = espectro_contexto(xw, a, J, Pp, contexto, fs, nb, f_min, f_max); %#ok<SAGROW>
                         y(end+1, 1) = find(strcmp(classes, silabas{w}{s}));                    %#ok<SAGROW>
                         conj(end+1, 1) = conj_grupo{w}(num);                                   %#ok<SAGROW>
                         arquivos{end+1, 1} = sprintf('%s_%03d.wav', silabas{w}{s}, num);      %#ok<SAGROW>
@@ -149,7 +160,7 @@ for m = 1:numel(metodos)
                 [xs, fs] = audioread(fullfile(lista(k).folder, nome));
                 xs = mean(xs, 2);
                 for a = 1 : Pp : numel(xs) - J + 1
-                    X(end+1, :) = espectro_bandas(xs(a : a + J - 1), fs, nb, f_min, f_max); %#ok<SAGROW>
+                    X(end+1, :) = espectro_contexto(xs, a, J, Pp, contexto, fs, nb, f_min, f_max); %#ok<SAGROW>
                     y(end+1, 1) = numel(classes);                                          %#ok<SAGROW>
                     conj(end+1, 1) = conj_grupo{3}(num);                                   %#ok<SAGROW>
                     arquivos{end+1, 1} = nome;                                             %#ok<SAGROW>
@@ -158,14 +169,15 @@ for m = 1:numel(metodos)
         end
 
         n_bandas = nb;
-        arq = fullfile(pasta_entradas, sprintf('entradas_%s_%d.mat', metodos{m}, nb));
+        arq = fullfile(pasta_entradas, sprintf('entradas_%s_%d%s.mat', metodos{m}, nb, sufixo_contexto(contexto)));
         % '-v7' = formato .mat que o MATLAB e o Octave leem igualmente
         save(arq, 'X', 'y', 'conj', 'arquivos', 'classes', 'f_min', 'f_max', ...
-             'n_bandas', 'fs', 'modo', 'janela', 'passo', '-v7');
-        fprintf('%-8s %2d faixas: %d amostras (treino %d, teste %d, validacao %d)\n', ...
-            metodos{m}, nb, numel(y), sum(conj == 1), sum(conj == 2), sum(conj == 3));
+             'n_bandas', 'fs', 'modo', 'janela', 'passo', 'contexto', '-v7');
+        fprintf('%-8s %2d faixas contexto [%s]: %d amostras (treino %d, teste %d, validacao %d)\n', ...
+            metodos{m}, nb, num2str(contexto), numel(y), sum(conj == 1), sum(conj == 2), sum(conj == 3));
         fprintf('         amostras por classe: %s\n', num2str(accumarray(y, 1)'));
     end
+  end
 end
 
 fprintf('\nEntradas salvas em: %s\n', pasta_entradas);

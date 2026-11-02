@@ -46,10 +46,13 @@ function [reconhecidas, reg] = reconhecer_palavra(x, fs, modelo, p)
     J  = round(p.janela * fs);                  % amostras por janela
     P  = round(p.passo  * fs);                  % amostras por passo
     nj = floor((numel(x) - J) / P) + 1;         % numero de janelas
-    V  = zeros(nj, modelo.n_bandas);
+    % Janelas vizinhas na entrada, IGUAL ao treino (ver espectro_contexto.m)
+    contexto = 0;
+    if isfield(modelo, 'contexto'), contexto = modelo.contexto; end
+    V  = zeros(nj, modelo.n_bandas * numel(contexto));
     for k = 1:nj
-        trecho  = x((k-1)*P + (1:J));
-        V(k, :) = espectro_bandas(trecho, fs, modelo.n_bandas, modelo.f_min, modelo.f_max);
+        V(k, :) = espectro_contexto(x, (k-1)*P + 1, J, P, contexto, fs, ...
+                                    modelo.n_bandas, modelo.f_min, modelo.f_max);
     end
     Vn = normalizar(V, modelo.normalizacao, modelo.stats);  % mesma normalizacao do treino
     classe = mlp_classificar(modelo.rede, Vn);
