@@ -1,22 +1,51 @@
-# reconhecimento_de_voz_rede_neural
+# Reconhecimento de voz com rede neural
 
-Reconhecimento das palavras DIREITA e ESQUERDA com uma MLP escrita à mão (MATLAB/GNU Octave).
+Reconhecimento das palavras DIREITA e ESQUERDA com uma MLP escrita à mão em MATLAB/GNU Octave. A rede reconhece as sílabas (di, rei, ta, es, quer, da e silêncio), e o programa 2 reconhece a palavra inteira a partir da sequência de sílabas.
+
+## Como rodar
+
+**No Windows, com dois cliques:** abra o `rodar_projeto.bat`. Ele procura o MATLAB ou o GNU Octave no computador, oferece instalar o Octave (pelo `winget`) se nenhum dos dois existir, pergunta se é para rodar só o programa 2 ou refazer tudo, e roda o projeto.
+
+**Dentro do MATLAB ou do Octave:** abra esta pasta no MATLAB (R2016b ou mais novo) ou no GNU Octave (6 ou mais novo) e rode:
+
+- `rodar_projeto`: confere o ambiente e roda o programa 2 com a rede já treinada (cerca de 1 minuto);
+- `rodar_projeto('tudo')`: confere o ambiente e refaz tudo do zero, da segmentação ao programa 2 (cerca de 10 minutos).
+
+O projeto usa só funções básicas (`audioread`, `fft`, `movmean`...), sem toolbox e sem pacote extra; não é preciso baixar nada. A divisão treino/validação/teste fica gravada em `rede/entradas/divisao.csv`, para ser a mesma no MATLAB e no Octave. O treino sorteia os pesos iniciais, e o MATLAB sorteia números diferentes do Octave: ao refazer o treino no MATLAB, o acerto pode variar uma ou duas palavras.
 
 ## Ordem de execução
 
-1. `segmentacao/segmentar_audios.m` — encontra as palavras nas gravações e corta as 3 sílabas (métodos tercos e energia) + silêncio → `segmentacao/saida/`
-2. `rede/extrair_entradas.m` — FFT em faixas de 0–5 kHz (32 e 64), janelas deslizantes, divisão 70/20/10 → `rede/entradas/`
-3. `rede/treinar_mlp.m` — treina e compara todas as combinações → `rede/resultados/`
-4. `rede/programa2_reconhecer.m` — programa 2: janela deslizante + máquina de estados
+1. `segmentacao/segmentar_audios.m`: encontra as palavras nas gravações e corta cada uma em 3 sílabas nos vales de energia, mais os trechos de silêncio → `segmentacao/saida/`
+2. `rede/extrair_entradas.m`: janelas de 150 ms (passo de 25 ms), FFT de 0 a 5 kHz em faixas, divisão 60/20/20 por repetição → `rede/entradas/`
+3. `rede/treinar_mlp.m`: treina a rede escolhida e mede o teste → `rede/resultados/`
+4. `rede/programa2_reconhecer.m`: programa 2, com janela deslizante e máquina de estados
+
+Experimentos usados para escolher a rede (não precisam ser rodados para usar o programa):
+
+- `rede/experimentos.m`: etapas 1 a 4 (entrada, normalização, camadas, ativação e taxa) e validação cruzada com 112 palavras. Ex.: `experimentos('etapa', 1)`, `experimentos('resumo', 1)`, `experimentos('validacao_cruzada')`
+
+Os resultados e as justificativas de cada escolha estão em `rede/resultados/RELATORIO.md`.
+
+## Rede final
+
+| Item | Escolha |
+|---|---|
+| Corte das sílabas | vales de energia |
+| Entrada | 32 faixas da janela atual e de 4 vizinhas (±50 e ±100 ms) = 160 entradas |
+| Normalização | cada janela dividida pelo seu maior valor |
+| Camadas | 160 → 64 → 32 → 7, sigmoide |
+| Treino | retropropagação com momento, taxa 0,5 |
+| Programa 2 | di → rei → ta / es → quer → da, ignorando até 2 janelas soltas fora da sequência |
+| Teste (29 palavras) | 24 reconhecidas (82,8%), nenhuma trocada; fala contínua 27 de 29 (93,1%) |
 
 ## Pastas
 
-- `material do professor/` — enunciado, slides e gravações originais (.aac)
-- `segmentacao/audios_wav/` — gravações convertidas para WAV (o Octave não lê .aac)
-- `segmentacao/saida/` — palavras inteiras, sílabas cortadas, silêncios, CSV dos cortes e figuras
-- `rede/` — funções da MLP (`mlp_*.m`), extração, treino e programa 2
+- `material do professor/`: enunciado, slides e gravações originais (.aac)
+- `segmentacao/audios_wav/`: gravações convertidas para WAV (o Octave não lê .aac)
+- `segmentacao/saida/`: palavras inteiras, sílabas, silêncios, CSV dos cortes e figuras
+- `rede/`: a MLP (`mlp.m`), a entrada da rede (`entrada.m`: FFT em faixas, contexto e normalização), extração, treino, programa 2 e experimentos
+- `rede/resultados/`: rede final, figuras, relatório e dados dos experimentos
 
 ## Rodar no VS Code
 
-`Ctrl+Shift+B` roda o arquivo .m aberto no GNU Octave (`.vscode/tasks.json`).
-O caminho do Octave nesse arquivo é o do PC onde foi configurado; em outro PC, ajuste o campo `command`.
+`Ctrl+Shift+B` roda o arquivo .m aberto no GNU Octave (`.vscode/tasks.json`). O caminho do Octave nesse arquivo é o do PC onde foi configurado; em outro PC, ajuste o campo `command`.

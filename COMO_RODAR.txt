@@ -1,0 +1,48 @@
+﻿COMO RODAR O PROJETO
+Reconhecimento das palavras DIREITA e ESQUERDA com rede neural MLP
+Pedro Lima de Assunção Filho - Redes Neurais
+
+
+1) NO MATLAB (R2016b ou mais novo)
+
+   Abra esta pasta no MATLAB e digite na janela de comandos:
+
+       rodar_projeto
+
+   Isso roda o programa 2 com a rede já treinada (cerca de 1 minuto).
+   Para refazer tudo do zero (segmentação dos áudios, treino da rede e
+   programa 2, cerca de 10 minutos), digite:
+
+       rodar_projeto('tudo')
+
+   Não é preciso instalar nenhuma toolbox.
+
+
+2) NO GNU OCTAVE (6 ou mais novo)
+
+   Os mesmos comandos do item 1, dentro do Octave.
+
+
+3) NO WINDOWS, SEM MATLAB E SEM OCTAVE
+
+   Dê dois cliques no arquivo:
+
+       rodar_projeto.bat
+
+   Ele procura o MATLAB ou o Octave no computador. Se não encontrar
+   nenhum dos dois, pergunta se pode instalar o GNU Octave (gratuito,
+   cerca de 400 MB) e, depois, roda o projeto. No começo, ele pergunta se
+   é para rodar só o programa 2 (opção 1) ou refazer tudo (opção 2).
+
+
+RESULTADO ESPERADO
+
+   Palavras de teste isoladas: 24 de 29 (82,8%)
+   Fala contínua:              27 de 29 (93,1%)
+
+   As figuras ficam na pasta rede/resultados/.
+   O relatório está em relatorio/relatorio_reconhecimento_de_voz.pdf.
+
+   Ao refazer tudo no MATLAB, o resultado pode variar uma ou duas
+   palavras: o MATLAB sorteia os pesos iniciais da rede de um jeito
+   diferente do Octave, onde o projeto foi desenvolvido.

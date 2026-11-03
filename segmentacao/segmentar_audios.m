@@ -1,51 +1,38 @@
-%% ========================================================================
-%  SEGMENTAR_AUDIOS.M
-%  ------------------------------------------------------------------------
-%  Trabalho: Reconhecimento de fonemas via MRNA (MLP)
-%  Palavras: DIREITA e ESQUERDA
+%% SEGMENTAR_AUDIOS.M - corta as gravacoes em palavras, silabas e silencios
 %
-%  O que este script faz (sem nenhum recorte manual):
-%    1) Le as gravacoes longas (varias repeticoes da mesma palavra).
-%    2) Encontra automaticamente onde cada palavra comeca e termina,
-%       usando a energia do sinal na faixa de frequencia da voz.
-%    3) Divide cada palavra em 3 trechos (silabas) por DOIS metodos,
-%       para depois compararmos qual treina melhor a rede:
-%         Metodo A - "tercos":  3 pedacos de mesma duracao.
-%         Metodo B - "energia": corta nos "vales" de energia, que
-%                               aparecem quando a boca fecha numa
-%                               consoante (/k/, /t/, /d/...).
-%    4) Recorta trechos de silencio entre as palavras (classe extra
-%       "silencio", que a rede usara para saber que nada foi dito).
-%    5) Salva tudo em arquivos .wav separados por classe e gera
-%       figuras para conferencia visual.
+% Trabalho: reconhecimento de fonemas via MRNA (MLP), palavras DIREITA e
+% ESQUERDA. Tudo e automatico, sem nenhum corte manual:
+%   1) le as duas gravacoes longas (68 "direita" e 73 "esquerda");
+%   2) mede o volume do som ao longo do tempo (energia, com a FFT, em
+%      pedacos de 20 ms) e acha onde cada palavra comeca e termina;
+%   3) corta cada palavra em 3 silabas nos "vales" do volume, que aparecem
+%      quando a boca fecha numa consoante (/k/, /t/, /d/...). Os cortes em
+%      tercos (3 pedacos iguais) tambem sao calculados: servem de reserva
+%      quando nao ha vale e ficam no CSV, para a comparacao do relatorio;
+%   4) recorta trechos de silencio entre as palavras (a 7a classe);
+%   5) grava tudo em arquivos .wav, separados por classe, e gera figuras
+%      para conferir os cortes.
 %
-%  Classes geradas (7 no total):
-%    direita  -> di, rei, ta
-%    esquerda -> es, quer, da
-%    silencio -> silencio
+% Classes (7): direita -> di, rei, ta; esquerda -> es, quer, da; silencio.
 %
-%  Estrutura de saida (criada automaticamente):
-%    saida/palavras/            palavras inteiras (para o programa 2)
-%    saida/tercos/<classe>/     trechos do metodo A
-%    saida/energia/<classe>/    trechos do metodo B
-%    saida/cortes_<palavra>.csv posicoes de todos os cortes (em segundos)
-%    saida/figuras/             graficos para conferencia
+% Saidas (criadas automaticamente):
+%   saida/palavras/             palavras inteiras (para o programa 2)
+%   saida/energia/<classe>/     trechos de cada silaba e do silencio
+%   saida/cortes_<palavra>.csv  tempo de cada corte (em segundos)
+%   saida/figuras/              graficos para conferir os cortes
 %
-%  Requisitos: MATLAB base (nao usa nenhuma toolbox).
-%  Funcoes prontas usadas: audioread, audiowrite, fft, movmean, sort.
-%  ========================================================================
+% So usa funcoes basicas (audioread, audiowrite, fft, movmean, sort),
+% sem toolbox.
 
 clear; clc; close all;
 
-%% ------------------------------------------------------------------------
-%  1. CONFIGURACAO (todos os parametros ajustaveis ficam aqui)
-%  ------------------------------------------------------------------------
+%% 1. Configuracao (todos os parametros ficam aqui)
 
 % Pasta onde este script esta (todos os caminhos partem dela)
 pasta_script = fileparts(mfilename('fullpath'));
 
-% Lista de gravacoes: nome da palavra, arquivo original (.aac) e uma
-% copia em .wav (usada se o MATLAB nao conseguir ler o .aac).
+% Lista de gravacoes: nome da palavra, arquivo original (.aac) e a copia
+% em .wav (a que e usada; o .aac so se o .wav nao existir).
 gravacoes = struct( ...
     'palavra', {'direita', 'esquerda'}, ...
     'arquivo', {fullfile(pasta_script, '..', 'material do professor', 'direita_-_68.aac'), ...
@@ -54,169 +41,163 @@ gravacoes = struct( ...
                     fullfile(pasta_script, 'audios_wav', 'esquerda.wav')}, ...
     'silabas', {{'di', 'rei', 'ta'}, {'es', 'quer', 'da'}});
 
-% --- Analise de energia por quadros (janelas curtas de tempo) ---
+% Curva de volume: o audio e dividido em pedacos curtos (quadros)
 dur_janela = 0.020;   % duracao de cada quadro: 20 ms
 dur_passo  = 0.010;   % deslocamento entre quadros: 10 ms (sobreposicao de 50%)
-f_min      = 250;     % faixa da voz considerada: 250 Hz ...
-f_max      = 6000;    % ... ate 6000 Hz (abaixo de 250 Hz ha ruido de fundo;
-                      % ate 6 kHz para nao perder o chiado do /s/)
-n_suav     = 3;       % suavizacao da curva de energia (media movel de 3 quadros)
+f_min      = 250;     % soma so as frequencias da voz, de 250 Hz ...
+f_max      = 6000;    % ... a 6000 Hz (abaixo de 250 Hz ha um zumbido de
+                      % fundo; ate 6 kHz para nao perder o chiado do /s/)
+n_suav     = 3;       % suaviza a curva (media de 3 quadros vizinhos)
 
-% --- Deteccao das palavras ---
-pct_piso      = 0.10; % "piso" de ruido = valor abaixo do qual estao 10% dos quadros
-limiar_baixo  = 15;   % quadro e considerado "som" se estiver 15 dB acima do piso
-limiar_alto   = 30;   % um segmento so vira palavra se seu pico passar 30 dB do piso
+% Deteccao das palavras
+pct_piso      = 0.10; % nivel do silencio da sala: valor abaixo do qual estao 10% dos quadros
+limiar_baixo  = 15;   % um quadro tem som se estiver 15 dB acima desse nivel
+limiar_alto   = 30;   % um trecho so vira palavra se o pico passar de 30 dB acima dele
 gap_min       = 0.120;% pausas menores que 120 ms dentro de uma palavra sao ignoradas
                       % (ex.: o fechamento da boca no /k/ de "esquerda")
-dur_min       = 0.200;% segmentos com menos de 200 ms sao descartados (estalos, ruidos)
-queda_apara   = 25;   % apara cada palavra onde a energia cai 25 dB abaixo do
-                      % pico dela (remove a "cauda" de reverberacao da sala)
+dur_min       = 0.200;% trechos com menos de 200 ms sao descartados (estalos, ruidos)
+queda_apara   = 25;   % apara o fim de cada palavra onde o volume cai 25 dB abaixo
+                      % do pico dela (tira o eco da sala)
 
-% --- Metodo B (vales de energia) ---
+% Corte das silabas nos vales de energia (no CSV, colunas "B")
 regiao_corte1 = [0.15 0.50]; % 1o corte procurado entre 15% e 50% da palavra
 regiao_corte2 = [0.45 0.95]; % 2o corte procurado entre 45% e 95% da palavra,
-                             % e sempre DEPOIS do 1o corte
-prom_min      = 0;    % profundidade minima do vale (dB). 0 = SEMPRE corta no
-                      % vale mais fundo da regiao, mesmo que raso; so usa
-                      % o corte de reserva se nao houver vale nenhum
-silaba_min    = 0.040;% nenhuma silaba pode ficar com menos de 40 ms; se os
-                      % vales gerarem um pedaco menor, a palavra usa os tercos
-% 2o corte (rei|ta e quer|da): o vale e procurado numa curva de energia
-% SO de 1 a 5 kHz. Abaixo de ~600 Hz ha um zumbido de fundo constante que
-% "enchia" o vale do fechamento do /t/ e do /d/ na curva de 250-6000 Hz;
-% de 1 a 5 kHz (formantes da vogal) o fechamento fica um vale bem fundo.
-% O corte vai no INICIO do vale (fim da vogal "ei"/"er"), e nao no fundo,
-% para o fechamento da consoante ficar no "ta"/"da".
-% Excecao: no "direita" o corte vai no FUNDO do vale. Ouvindo os
-% trechos, no inicio do vale o "rei" ficava cortado cedo demais (o fim
-% do "ei" ia para o "ta").
+                             % e sempre depois do 1o corte
+prom_min      = 0;    % profundidade minima do vale (dB). Com 0, corta sempre no
+                      % vale mais fundo da regiao, mesmo raso; o corte de
+                      % reserva so e usado se nao houver vale nenhum
+silaba_min    = 0.040;% nenhuma silaba pode ter menos de 40 ms; se os vales
+                      % derem um pedaco menor, a palavra e cortada em tercos
+% 2o corte (rei|ta e quer|da): o vale e procurado numa curva de volume so
+% de 1 a 5 kHz. Abaixo de ~600 Hz ha um zumbido de fundo constante, que
+% "enchia" o vale do /t/ e do /d/ na curva de 250 a 6000 Hz; de 1 a 5 kHz,
+% onde fica o som das vogais, esse vale aparece bem fundo.
+% No "esquerda", o corte vai no comeco do vale (fim da vogal "er"), para o
+% fechamento do /d/ ficar no "da". No "direita", vai no fundo do vale:
+% ouvindo os trechos, com o corte no comeco o "rei" ficava curto demais
+% (o fim do "ei" ia para o "ta").
 f_min_corte2  = 1000;
 f_max_corte2  = 5000;
 corte2_no_fundo = {'direita'};   % palavras com o 2o corte no fundo do vale
 
-% --- Ajuste fino das fronteiras ---
-% Ouvindo os trechos, o "ta" e o "da" comecavam tarde demais (o fechamento
-% da boca do /t/ e do /d/ ficava no trecho anterior). Valores positivos
-% movem o corte para ANTES; negativos, para depois.
-% (O 2o corte do metodo B ja e posto no inicio do fechamento e nao usa
-%  adianta_corte2; ele so vale para os tercos e para o corte de reserva.)
+% Ajuste fino das fronteiras, so para os cortes em tercos e de reserva
+% (o 2o corte nos vales ja fica no lugar certo e nao usa isto). Ouvindo os
+% trechos, o "ta" e o "da" comecavam tarde demais. Valor positivo adianta
+% o corte; negativo, atrasa.
 adianta_corte1 = 0.000; % fronteira di|rei e es|quer (s)
 adianta_corte2 = 0.030; % fronteira rei|ta e quer|da: 30 ms mais cedo (s)
 
-% --- Trechos de silencio ---
+% Trechos de silencio
 dur_silencio  = 0.300;% duracao de cada amostra de silencio: 300 ms (cabem
                       % varias janelas do programa 2 em cada uma)
 margem_sil    = 0.100;% distancia minima de 100 ms de qualquer palavra
 
 % Pastas de saida
 pasta_saida = fullfile(pasta_script, 'saida');
-metodos     = {'tercos', 'energia'};
 classes     = {'di', 'rei', 'ta', 'es', 'quer', 'da', 'silencio'};
 
-% Cria todas as pastas de saida (se ja existirem, nada acontece)
-criar_pasta(fullfile(pasta_saida, 'palavras'));
-criar_pasta(fullfile(pasta_saida, 'figuras'));
-for m = 1:numel(metodos)
-    for c = 1:numel(classes)
-        criar_pasta(fullfile(pasta_saida, metodos{m}, classes{c}));
-    end
+% Cria todas as pastas de saida (as que ainda nao existem)
+pastas = [{fullfile(pasta_saida, 'palavras'), fullfile(pasta_saida, 'figuras')}, ...
+          cellfun(@(c) fullfile(pasta_saida, 'energia', c), classes, 'UniformOutput', false)];
+for i = 1:numel(pastas)
+    if ~exist(pastas{i}, 'dir'), mkdir(pastas{i}); end
 end
 
-cont_silencio = 0;    % contador global de amostras de silencio
+cont_silencio = 0;    % quantos trechos de silencio ja foram gravados
 
-%% ------------------------------------------------------------------------
-%  2. PROCESSA CADA GRAVACAO
-%  ------------------------------------------------------------------------
+%% 2. Processa cada gravacao
 for g = 1:numel(gravacoes)
     palavra = gravacoes(g).palavra;
     silabas = gravacoes(g).silabas;
     fprintf('\n=== Processando "%s" ===\n', palavra);
 
-    % ---- 2.1 Leitura do audio ------------------------------------------
-    % Tenta ler o .aac original; se falhar, usa a copia .wav.
-    try
+    % 2.1 Leitura do audio
+    % Usa a copia .wav (o Octave nao le .aac, e cada programa decodifica o
+    % .aac de um jeito; com o .wav o resultado e o mesmo em qualquer um).
+    % Sem o .wav, tenta o .aac original.
+    if exist(gravacoes(g).arquivo_wav, 'file')
+        [x, fs] = audioread(gravacoes(g).arquivo_wav);
+        fprintf('Lido: %s\n', gravacoes(g).arquivo_wav);
+    else
         [x, fs] = audioread(gravacoes(g).arquivo);
         fprintf('Lido: %s\n', gravacoes(g).arquivo);
-    catch
-        [x, fs] = audioread(gravacoes(g).arquivo_wav);
-        fprintf('AAC nao suportado; lido: %s\n', gravacoes(g).arquivo_wav);
     end
 
-    % Se o audio for estereo (2 colunas), faz a media dos canais -> mono.
+    % Audio estereo (2 colunas): faz a media dos dois canais (mono)
     x = mean(x, 2);
     fprintf('Taxa de amostragem: %d Hz | duracao: %.1f s\n', fs, numel(x)/fs);
 
-    % ---- 2.2 Energia na faixa da voz, quadro a quadro ------------------
+    % 2.2 Curva de volume (energia na faixa da voz), quadro a quadro
     % Cada quadro e uma janela de J amostras; quadros consecutivos
     % comecam P amostras depois do anterior.
     J  = round(dur_janela * fs);           % amostras por quadro (960 a 48 kHz)
     P  = round(dur_passo  * fs);           % amostras por passo  (480 a 48 kHz)
     nq = floor((numel(x) - J) / P) + 1;    % numero total de quadros
 
-    % Matriz de indices: coluna k contem as amostras do quadro k.
-    % (1:J)' e um vetor coluna; (0:nq-1)*P e um vetor linha; a soma
-    % gera uma matriz J x nq (expansao automatica do MATLAB/Octave).
+    % Monta todos os quadros de uma vez: a coluna k tem as amostras do
+    % quadro k. (1:J)' e uma coluna, (0:nq-1)*P e uma linha, e a soma das
+    % duas da uma matriz J x nq com os indices de cada quadro.
     idx = (1:J)' + (0:nq-1) * P;
     Q   = x(idx);                          % cada coluna = um quadro do sinal
 
-    % Janela de Hamming (calculada a mao para nao depender de toolbox):
-    % suaviza as bordas do quadro e reduz o "vazamento" na FFT.
+    % Janela de Hamming (calculada a mao, sem toolbox): suaviza as bordas
+    % do quadro, para o corte brusco nao criar frequencias falsas na FFT.
     n   = (0:J-1)';
     ham = 0.54 - 0.46 * cos(2*pi*n / (J-1));
     Q   = Q .* ham;
 
-    % FFT de cada quadro (coluna). Guardamos so a metade util (sem espelho).
+    % FFT de cada quadro (cada coluna). So a primeira metade interessa (a outra e espelho).
     X   = abs(fft(Q)).^2;                  % potencia de cada frequencia
     X   = X(1:floor(J/2)+1, :);
     f   = (0:floor(J/2))' * fs / J;        % frequencia (Hz) de cada linha
 
-    % Soma a potencia apenas na faixa da voz e converte para decibeis.
+    % Soma a potencia so na faixa da voz e passa para decibeis: o volume do quadro
     banda = (f >= f_min) & (f <= f_max);
     e = 10 * log10(sum(X(banda, :), 1) + 1e-10);   % vetor linha, 1 x nq
     e = movmean(e, n_suav);                        % suaviza a curva
 
-    % Curva so de 1-5 kHz, usada para o 2o corte (ver configuracao).
+    % Curva so de 1 a 5 kHz, usada no 2o corte (ver configuracao)
     banda2 = (f >= f_min_corte2) & (f <= f_max_corte2);
     e2 = movmean(10 * log10(sum(X(banda2, :), 1) + 1e-10), n_suav);
 
-    % ---- 2.3 Deteccao das palavras -------------------------------------
-    % Piso de ruido: ordena as energias e pega o valor no percentil 10%.
+    % 2.3 Deteccao das palavras
+    % Nivel do silencio: ordena os volumes e pega o valor que deixa 10% abaixo
     v    = sort(e);
     piso = v(max(1, round(pct_piso * numel(v))));
 
-    % Quadros "ativos" = acima do limiar baixo.
+    % Quadros com som: acima do limiar
     ativo = e > piso + limiar_baixo;
 
-    % Encontra inicio (subida 0->1) e fim (descida 1->0) de cada trecho ativo.
+    % Inicio (passa de 0 para 1) e fim (de 1 para 0) de cada trecho com som
     d   = diff([0, ativo, 0]);
     ini = find(d == 1);          % primeiro quadro ativo de cada trecho
     fim = find(d == -1) - 1;     % ultimo quadro ativo de cada trecho
 
-    % Une trechos separados por pausas curtas (< gap_min).
+    % Junta trechos separados por pausas curtas (menores que gap_min)
     gap_q = gap_min / dur_passo;              % pausa minima em quadros
     I = ini(1); F = [];
     for k = 2:numel(ini)
         if (ini(k) - fim(k-1) - 1) < gap_q
             continue;                         % pausa curta: mesma palavra
         end
-        F(end+1) = fim(k-1);                  %#ok<SAGROW> fecha a palavra anterior
-        I(end+1) = ini(k);                    %#ok<SAGROW> abre a proxima
+        F(end+1) = fim(k-1);                  % fecha a palavra anterior
+        I(end+1) = ini(k);                    % abre a proxima
     end
     F(end+1) = fim(end);
 
-    % Mantem so segmentos longos o bastante e com pico forte o bastante.
+    % Fica so com trechos longos e fortes o bastante para serem palavras
     dur_q = dur_min / dur_passo;
     seg = [];                                 % cada linha: [inicio fim] em quadros
     for k = 1:numel(I)
         trecho = e(I(k):F(k));
         if (F(k) - I(k) + 1) >= dur_q && max(trecho) > piso + limiar_alto
-            seg(end+1, :) = [I(k), F(k)];     %#ok<SAGROW>
+            seg(end+1, :) = [I(k), F(k)];
         end
     end
     seg_bruto = seg;                          % guardado para achar os silencios
 
-    % Apara cada palavra: mantem so os quadros a menos de 'queda_apara'
-    % dB do pico da propria palavra (remove a cauda de reverberacao).
+    % Apara cada palavra: fica so com os quadros a menos de queda_apara dB
+    % do pico da propria palavra (tira o eco do fim).
     for k = 1:size(seg, 1)
         trecho = e(seg(k,1):seg(k,2));
         acima  = find(trecho > max(trecho) - queda_apara);
@@ -225,32 +206,31 @@ for g = 1:numel(gravacoes)
     n_pal = size(seg, 1);
     fprintf('Palavras encontradas: %d\n', n_pal);
 
-    % ---- 2.4 Cortes das silabas e gravacao dos arquivos ----------------
-    % Tabela com os cortes: palavra, inicio, corte1/corte2 (A e B), fim,
-    % e se o metodo B precisou usar o terco como reserva.
+    % 2.4 Cortes das silabas e gravacao dos arquivos
+    % Tabela dos cortes: palavra, inicio, cortes em tercos (A), cortes nos
+    % vales (B), fim, e quantos cortes nos vales usaram a reserva.
     tabela = zeros(n_pal, 8);
     for k = 1:n_pal
         a = seg(k, 1);  b = seg(k, 2);        % primeiro e ultimo quadro
         L = b - a + 1;                        % duracao da palavra em quadros
 
-        % Metodo A: cortes em 1/3 e 2/3 da duracao.
+        % Cortes em tercos (A): em 1/3 e 2/3 da duracao
         cA = a + round([1/3, 2/3] * L);
 
         % Ajuste fino das fronteiras (adianta_corte1/2, em quadros)
         ajuste = round([adianta_corte1, adianta_corte2] / dur_passo);
         cA = cA - ajuste;
 
-        % Metodo B, 1o corte: vale mais profundo na regiao.
+        % 1o corte nos vales (B): o vale mais fundo da regiao
         [c1, p1] = vale_na_regiao(e, a, b, regiao_corte1);
         reserva1 = isempty(c1) || p1 < prom_min;
-        if reserva1, c1 = cA(1); else, c1 = c1 - ajuste(1); end  % sem vale claro: terco
+        if reserva1, c1 = cA(1); else, c1 = c1 - ajuste(1); end  % sem vale: usa o terco
 
-        % Metodo B, 2o corte: curva de 1-5 kHz, corta no INICIO do vale
-        % (ou no FUNDO, nas palavras de 'corte2_no_fundo'), e
-        % so procura DEPOIS do 1o corte (+ silaba_min), para os dois cortes
-        % nunca cairem no mesmo vale e espremerem a silaba do meio.
-        % Sem vale claro, divide ao meio o que sobra depois do 1o corte (o
-        % terco poderia cair antes do 1o corte e descartar a palavra toda).
+        % 2o corte nos vales (B): curva de 1 a 5 kHz, no comeco do vale (ou
+        % no fundo, nas palavras de corte2_no_fundo). So procura depois do
+        % 1o corte (mais silaba_min), para os dois cortes nunca cairem no
+        % mesmo vale e espremerem a silaba do meio. Sem vale, divide ao meio
+        % o que sobra depois do 1o corte.
         min_q = round(silaba_min / dur_passo);
         regiao2 = [max(regiao_corte2(1), (c1 + min_q - a) / L), regiao_corte2(2)];
         [c2_fundo, p2, c2] = vale_na_regiao(e2, a, b, regiao2);
@@ -259,21 +239,20 @@ for g = 1:numel(gravacoes)
         if reserva2
             c2 = round((c1 + b) / 2);
         else
-            c2 = max(c2, c1 + min_q);          % (ja no inicio/fundo do vale)
+            c2 = max(c2, c1 + min_q);          % garante a distancia minima do 1o corte
         end
         cB = [c1, c2];
 
-        % Protecao: os dois vales podem cair no mesmo ponto (ex.: ambos
-        % exatamente em 50% da palavra), gerando uma silaba vazia. Se
-        % qualquer pedaco ficar menor que 'silaba_min', usa os tercos.
+        % Protecao: se algum pedaco ficar menor que silaba_min (os dois
+        % cortes muito perto), a palavra e cortada em tercos.
         tam = diff([a, cB, b + 1]);              % duracao dos 3 pedacos (quadros)
         if any(tam < silaba_min / dur_passo)
             cB = cA;
             reserva1 = true;  reserva2 = true;
         end
 
-        % Converte quadros -> amostras. O quadro q (1, 2, ...) comeca na
-        % amostra (q-1)*P + 1; usamos o CENTRO do quadro como posicao.
+        % Passa de numero do quadro para numero da amostra. O quadro q comeca
+        % na amostra (q-1)*P + 1; a posicao usada e o centro do quadro.
         q2s = @(q) (q - 1) * P + round(J/2);
         s_ini = q2s(a);
         s_fim = q2s(b);
@@ -285,25 +264,21 @@ for g = 1:numel(gravacoes)
         audiowrite(fullfile(pasta_saida, 'palavras', ...
             sprintf('%s_%03d.wav', palavra, k)), w, fs);
 
-        % Salva os 3 trechos de cada metodo.
-        cortes = {cA, cB};
-        for m = 1:2
-            lim = [s_ini, q2s(cortes{m}(1)), q2s(cortes{m}(2)), s_fim];
-            for s = 1:3
-                trecho = x(lim(s) : lim(s+1) - 1);
-                nome = sprintf('%s_%03d.wav', silabas{s}, k);
-                audiowrite(fullfile(pasta_saida, metodos{m}, silabas{s}, nome), ...
-                    trecho, fs);
-            end
+        % Salva as 3 silabas (cortes nos vales)
+        lim = [s_ini, q2s(cB(1)), q2s(cB(2)), s_fim];
+        for s = 1:3
+            trecho = x(lim(s) : lim(s+1) - 1);
+            nome = sprintf('%s_%03d.wav', silabas{s}, k);
+            audiowrite(fullfile(pasta_saida, 'energia', silabas{s}, nome), trecho, fs);
         end
 
-        % Guarda os tempos (em segundos) para a tabela CSV.
+        % Guarda os tempos (em segundos) para o CSV
         tabela(k, :) = [k, q2s(a), q2s(cA(1)), q2s(cA(2)), ...
                         q2s(cB(1)), q2s(cB(2)), q2s(b), reserva1 + reserva2] ./ ...
                        [1, fs, fs, fs, fs, fs, fs, 1];
     end
 
-    % Escreve a tabela CSV (abre no Excel).
+    % Grava o CSV dos cortes (abre no Excel)
     arq_csv = fullfile(pasta_saida, sprintf('cortes_%s.csv', palavra));
     fid = fopen(arq_csv, 'w');
     fprintf(fid, ['palavra;inicio_s;A_corte1_s;A_corte2_s;' ...
@@ -313,10 +288,10 @@ for g = 1:numel(gravacoes)
     fprintf('Cortes do metodo B sem nenhum vale (usaram o corte de reserva): %d de %d\n', ...
         sum(tabela(:, 8)), 2 * n_pal);
 
-    % ---- 2.5 Amostras de silencio --------------------------------------
-    % Entre o fim de uma palavra e o inicio da proxima (antes de aparar,
-    % para nao pegar a cauda de reverberacao), recorta 'dur_silencio'
-    % segundos bem no meio da pausa, respeitando a margem.
+    % 2.5 Amostras de silencio
+    % Entre o fim de uma palavra e o inicio da proxima, recorta dur_silencio
+    % segundos bem no meio da pausa, longe das palavras (margem_sil). Usa os
+    % limites antes de aparar, para nao pegar o eco do fim da palavra.
     n_sil = round(dur_silencio * fs);
     marg  = round(margem_sil * fs);
     for k = 1:size(seg_bruto, 1) - 1
@@ -327,42 +302,36 @@ for g = 1:numel(gravacoes)
             trecho = x(meio - floor(n_sil/2) : meio - floor(n_sil/2) + n_sil - 1);
             cont_silencio = cont_silencio + 1;
             nome = sprintf('silencio_%03d.wav', cont_silencio);
-            % A mesma amostra de silencio vai para os dois metodos,
-            % para que cada conjunto (tercos/energia) fique completo.
-            for m = 1:2
-                audiowrite(fullfile(pasta_saida, metodos{m}, 'silencio', nome), ...
-                    trecho, fs);
-            end
+            audiowrite(fullfile(pasta_saida, 'energia', 'silencio', nome), trecho, fs);
         end
     end
 
-    % ---- 2.6 Figuras para conferencia ----------------------------------
+    % 2.6 Figuras para conferencia
     t = ((0:nq-1) * P + J/2) / fs;            % tempo (s) do centro de cada quadro
 
     % Figura 1: gravacao inteira com as palavras detectadas.
     fig = figure('Visible', 'off', 'Position', [0 0 1800 500]);
     h1 = plot(t, e, 'b'); hold on;
-    % (linhas feitas com plot: yline/xline nao existem no Octave antigo)
+    % (linhas feitas com plot: o Octave antigo nao tem yline/xline)
     h2 = plot(t([1 end]), [1 1] * (piso + limiar_baixo), 'k--');
     for k = 1:n_pal
         xr = t(seg(k, :));
         h3 = patch([xr(1) xr(2) xr(2) xr(1)], [min(e) min(e) max(e) max(e)], ...
               'g', 'FaceAlpha', 0.2, 'EdgeColor', 'none');
     end
+    xlim(t([1 end]));  ylim([piso - 10, max(e) + 5]);
     xlabel('tempo (s)'); ylabel('energia 250-6000 Hz (dB)');
-    title(sprintf('"%s": %d palavras detectadas', palavra, n_pal));
+    title(sprintf('%s: %d palavras detectadas', upper(palavra), n_pal));
     legend([h1 h2 h3], {'energia do som (250-6000 Hz)', ...
         sprintf('limiar: acima disso e som (piso + %d dB)', limiar_baixo), ...
         'palavra detectada'}, 'Location', 'southoutside', 'Orientation', 'horizontal');
     saveas(fig, fullfile(pasta_saida, 'figuras', sprintf('%s_deteccao.png', palavra)));
     close(fig);
 
-    % Cada palavra tem 4 linhas verticais de cada metodo: inicio, corte 1,
-    % corte 2 e fim. Os 2 cortes dividem a palavra nas 3 silabas. (O
-    % silencio nao e cortado da palavra: vem das pausas ENTRE as palavras.)
+    % Cada palavra tem 4 linhas verticais: inicio, 1o corte, 2o corte e fim.
+    % (O silencio nao sai da palavra: vem das pausas entre as palavras.)
 
-    % Figura 2: 12 palavras espalhadas, com os cortes A e B sobre as
-    % curvas de energia.
+    % Figura 2: 12 palavras, com os cortes sobre as curvas de volume
     fig = figure('Visible', 'off', 'Position', [0 0 1800 900]);
     amostra = round(linspace(1, n_pal, 12));
     for i = 1:12
@@ -374,26 +343,25 @@ for g = 1:numel(gravacoes)
         h2 = plot(t(janela), e2(janela), 'm');
         yl = ylim;  vline = @(x, estilo) plot([x x], yl, estilo, 'LineWidth', 1.5);
         h3 = vline(t(a), 'k'); vline(t(b), 'k');
-        h4 = vline(tabela(k, 3), 'g--'); vline(tabela(k, 4), 'g--');
-        h5 = vline(tabela(k, 5), 'r');   vline(tabela(k, 6), 'r');
+        h4 = vline(tabela(k, 5), 'r');   vline(tabela(k, 6), 'r');
         title(sprintf('%s #%d', palavra, k)); xlabel('tempo (s)'); ylabel('dB');
     end
     % Titulo e legenda gerais (annotation funciona no MATLAB e no Octave;
-    % o sgtitle nao existe no Octave).
+    % o Octave nao tem sgtitle)
     annotation('textbox', [0 0.96 1 0.04], 'String', ...
-        sprintf('"%s": onde cada metodo corta as silabas %s | %s | %s', ...
-        palavra, silabas{:}), ...
+        sprintf('%s: cortes das silabas %s | %s | %s nos vales de energia', ...
+        upper(palavra), silabas{:}), ...
         'HorizontalAlignment', 'center', 'EdgeColor', 'none', 'FontWeight', 'bold');
-    lg = legend([h1 h2 h3 h4 h5], {'energia 250-6000 Hz (usada no corte 1)', ...
+    lg = legend([h1 h2 h3 h4], {'energia 250-6000 Hz (usada no corte 1)', ...
         'energia 1-5 kHz (usada no corte 2)', 'inicio / fim da palavra', ...
-        'metodo A (tercos): corte 1 e corte 2', 'metodo B (energia): corte 1 e corte 2'}, ...
+        'corte 1 e corte 2'}, ...
         'Orientation', 'horizontal');
     set(lg, 'Position', [0.15 0.01 0.7 0.03]);
     saveas(fig, fullfile(pasta_saida, 'figuras', sprintf('%s_cortes.png', palavra)));
     close(fig);
 
-    % Figura 3: a ONDA (o sinal de audio) de 6 palavras, com os cortes do
-    % metodo B e o nome de cada silaba. Os vales sao onde a onda "afina".
+    % Figura 3: a onda do som de 6 palavras, com os cortes e o nome de cada
+    % silaba. Os vales sao onde a onda "afina".
     fig = figure('Visible', 'off', 'Position', [0 0 1800 900]);
     amostra = round(linspace(1, n_pal, 6));
     for i = 1:6
@@ -403,7 +371,7 @@ for g = 1:numel(gravacoes)
         tt = (s0:s1) / fs;  onda = x(s0:s1);  amp = max(abs(onda));
         subplot(3, 2, i);
         h1 = plot(tt, onda, 'Color', [0.55 0.55 0.55]); hold on;
-        % envoltoria: amplitude media em janelas de 10 ms (contorno da onda)
+        % contorno da onda: amplitude media em pedacos de 10 ms
         env = sqrt(movmean(onda.^2, round(0.010 * fs)));
         h2 = plot(tt, env * amp / max(env), 'b', 'LineWidth', 1.2);
         vline = @(x, estilo) plot([x x], [-1 1] * amp, estilo, 'LineWidth', 2);
@@ -418,10 +386,10 @@ for g = 1:numel(gravacoes)
         title(sprintf('%s #%d', palavra, k)); xlabel('tempo (s)'); ylabel('amplitude');
     end
     annotation('textbox', [0 0.96 1 0.04], 'String', ...
-        sprintf('"%s": onda do audio e cortes do metodo B (energia)', palavra), ...
+        sprintf('%s: onda do audio e cortes das silabas', upper(palavra)), ...
         'HorizontalAlignment', 'center', 'EdgeColor', 'none', 'FontWeight', 'bold');
     lg = legend([h1 h2 h3 h4], {'onda (sinal de audio)', 'contorno da onda (amplitude)', ...
-        'inicio / fim da palavra', 'corte 1 e corte 2 (metodo B)'}, ...
+        'inicio / fim da palavra', 'corte 1 e corte 2'}, ...
         'Orientation', 'horizontal');
     set(lg, 'Position', [0.2 0.01 0.6 0.03]);
     saveas(fig, fullfile(pasta_saida, 'figuras', sprintf('%s_ondas.png', palavra)));
@@ -431,6 +399,6 @@ end
 fprintf('\nAmostras de silencio salvas: %d\n', cont_silencio);
 fprintf('Pronto! Arquivos em: %s\n', pasta_saida);
 
-% Observacao: as funcoes auxiliares criar_pasta e vale_na_regiao estao
-% em arquivos separados (criar_pasta.m e vale_na_regiao.m) nesta mesma
-% pasta. Assim o script roda igual no MATLAB e no GNU Octave.
+% Observacao: a funcao vale_na_regiao fica em vale_na_regiao.m, nesta
+% mesma pasta. (O Octave nao aceita funcoes no fim de um script e o MATLAB
+% so aceita la; em arquivo separado, o script roda igual nos dois.)

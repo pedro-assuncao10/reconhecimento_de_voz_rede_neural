@@ -1,21 +1,21 @@
 function [corte, prom, inicio] = vale_na_regiao(e, a, b, regiao)
-    % VALE_NA_REGIAO  Acha o "vale" de energia mais profundo numa parte da palavra.
-    %   Usada pelo Metodo B de segmentar_audios.m para decidir onde cortar
-    %   as silabas: quando a boca fecha numa consoante (/k/, /t/, /d/),
-    %   a energia do som cai e forma um vale na curva.
+    % VALE_NA_REGIAO  Acha o vale mais fundo da curva de volume numa parte
+    % da palavra. E usada por segmentar_audios.m para decidir onde cortar as
+    % silabas: quando a boca fecha numa consoante (/k/, /t/, /d/), o volume
+    % do som cai e forma um vale na curva.
     %
     % Entradas:
-    %   e      - curva de energia (dB) da gravacao inteira, um valor por quadro
+    %   e      - curva de volume (dB) da gravacao inteira, um valor por quadro
     %   a, b   - primeiro e ultimo quadro da palavra
-    %   regiao - [inicio fim] relativos a palavra, ex.: [0.15 0.50] = de 15% a 50%
+    %   regiao - onde procurar, em fracao da palavra. Ex.: [0.15 0.50] = de
+    %            15% a 50% da palavra
     % Saidas:
     %   corte  - quadro do vale escolhido ([] se nao houver nenhum)
-    %   prom   - profundidade do vale em dB (proeminencia): quanto ele
-    %            fica abaixo do MENOR dos dois picos que o cercam.
-    %   inicio - quadro onde o vale COMECA: andando do fundo do vale para a
-    %            esquerda, o primeiro ponto que fica a mais de meia
-    %            profundidade acima do fundo. E onde a vogal anterior acaba
-    %            e o fechamento da consoante comeca.
+    %   prom   - profundidade do vale em dB: quanto ele fica abaixo do mais
+    %            baixo dos dois picos ao redor dele
+    %   inicio - quadro onde o vale comeca: andando do fundo para a
+    %            esquerda, o primeiro ponto que passa de meia profundidade.
+    %            E onde a vogal anterior acaba e a consoante comeca.
 
     w = e(a:b);                                 % energia so desta palavra
     n = numel(w);

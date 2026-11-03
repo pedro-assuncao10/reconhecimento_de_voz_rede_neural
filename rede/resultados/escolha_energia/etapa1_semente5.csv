@@ -1,0 +1,5 @@
+etapa;faixas;contexto;normalizacao;ocultas;ativacao;taxa;semente;acerto_treino;acerto_validacao;silabas_validacao;di;rei;ta;es;quer;da;palavras_validacao;melhor_epoca;tempo_s
+1;32;nao;db;64;sigmoide;0.5;5;0.8945;0.8254;0.7815;0.6988;0.8846;0.8537;0.6116;0.7345;0.9057;0.7037;189;42.4
+1;32;sim;db;64;sigmoide;0.5;5;0.9613;0.8643;0.8338;0.8313;0.8923;0.8902;0.7438;0.6637;0.9811;0.7778;108;48.6
+1;64;nao;db;64;sigmoide;0.5;5;0.9164;0.8266;0.7824;0.6988;0.8923;0.8537;0.6612;0.6637;0.9245;0.7037;110;33.0
+1;64;sim;db;64;sigmoide;0.5;5;0.8508;0.7814;0.6979;0.8554;0.8538;0.0000;0.7190;0.7876;0.9717;0.3704;25;28.1

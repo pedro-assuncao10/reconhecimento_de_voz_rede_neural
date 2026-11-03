@@ -1,63 +1,64 @@
-%% ========================================================================
-%  PROGRAMA2_RECONHECER.M
-%  ------------------------------------------------------------------------
-%  Programa 2 do trabalho: reconhecimento das palavras inteiras DIREITA e
-%  ESQUERDA a partir dos trechos que a rede aprendeu (treinar_mlp.m).
-%  A logica (janela deslizante + maquina de estados) esta em
-%  reconhecer_palavra.m.
+%% PROGRAMA2_RECONHECER.M - programa 2: reconhecimento das palavras
 %
-%  Faz tres coisas:
-%    PARTE 1 - Testa cada palavra de TESTE isoladamente (palavras que a
-%              rede nunca viu no treino) e monta uma tabela de acertos.
-%    PARTE 2 - Simula uma fala continua: emenda todas as palavras de teste
-%              em ordem aleatoria, com silencio real entre elas, e mostra
-%              o que o sistema reconhece ao longo do tempo.
-%    PARTE 3 - (opcional) Reconhece um arquivo qualquer escolhido por
-%              voce, ex.: uma gravacao nova. Basta preencher arquivo_extra.
+% Reconhece as palavras inteiras DIREITA e ESQUERDA usando a rede treinada
+% (treinar_mlp.m). A janela deslizante e a maquina de estados estao em
+% reconhecer_palavra.m.
 %
-%  Saidas (pasta resultados/):
-%    programa2_fluxo.png - grafico da Parte 2
-%  Requisito: rodar antes segmentar_audios.m, extrair_entradas.m e treinar_mlp.m
-%  ========================================================================
+% Faz tres coisas:
+%   Parte 1 - reconhece cada palavra de teste sozinha (palavras que a rede
+%             nunca viu no treino) e mostra uma tabela de acertos.
+%   Parte 2 - simula uma fala continua: emenda todas as palavras de teste,
+%             em ordem sorteada, com silencio de verdade entre elas, e
+%             confere o que o sistema reconhece ao longo do tempo.
+%   Parte 3 - (opcional) reconhece um arquivo .wav qualquer, por exemplo
+%             uma gravacao nova. Basta preencher arquivo_extra.
+%
+% Saida (pasta resultados/): programa2_fluxo.png, o grafico da Parte 2.
+% Antes, rodar segmentar_audios.m, extrair_entradas.m e treinar_mlp.m (ou
+% usar a rede que ja esta salva em resultados/modelo_final.mat).
 
 clear; clc; close all;
 
-%% 1. CONFIGURACAO ---------------------------------------------------------
+%% 1. Configuracao
 pasta_script   = fileparts(mfilename('fullpath'));
 pasta_palavras = fullfile(pasta_script, '..', 'segmentacao', 'saida', 'palavras');
-pasta_sil      = fullfile(pasta_script, '..', 'segmentacao', 'saida', 'tercos', 'silencio');
+pasta_sil      = fullfile(pasta_script, '..', 'segmentacao', 'saida', 'energia', 'silencio');
 pasta_result   = fullfile(pasta_script, 'resultados');
 
-% PARTE 3: caminho de um .wav para reconhecer ('' = nao usar)
+% Parte 3: caminho de um .wav para reconhecer ('' = nao usar)
 arquivo_extra = '';
 
-rng(7);   % semente fixa para a ordem das palavras na Parte 2
+rng(7);   % semente fixa: a ordem das palavras da Parte 2 sai sempre igual
 
-% Carrega a melhor rede (e como normalizar as entradas para ela)
+% Carrega a rede treinada (e como normalizar as entradas para ela)
 load(fullfile(pasta_result, 'modelo_final.mat'), 'modelo');
 
-% Parametros da janela deslizante e da maquina de estados.
-% A janela e o passo sao OS MESMOS usados para gerar as amostras de treino
-% (extrair_entradas.m), por isso vem do proprio modelo.
-p.janela       = modelo.janela;  % duracao de cada janela analisada (s) ~ uma silaba
-p.passo        = modelo.passo;   % deslocamento entre janelas (s)
-p.n_conf       = 1;      % janelas seguidas iguais para aceitar um trecho
+% Parametros da janela deslizante e da maquina de estados. A janela e o
+% passo sao os mesmos do treino (extrair_entradas.m), por isso vem do
+% proprio modelo.
+p.janela       = modelo.janela;  % duracao de cada janela (150 ms)
+p.passo        = modelo.passo;   % quanto a janela anda de cada vez (25 ms)
+p.n_conf       = 1;      % janelas seguidas iguais para aceitar uma silaba
                          % (com 2, a silaba do meio, que as vezes aparece
-                         %  em uma janela so, era descartada)
+                         % numa janela so, era perdida)
 p.max_silencio = 0.300;  % silencio maximo tolerado no meio de uma palavra (s)
+p.max_fora     = 2;      % janelas seguidas fora da ordem que sao ignoradas
+                         % (erro isolado da rede). Uma silaba falada ocupa
+                         % de 6 a 10 janelas, entao uma silaba trocada de
+                         % verdade continua reprovando a palavra
 fprintf('Rede: metodo %s | %d faixas | %s | ocultas [%s] | %s | contexto [%s]\n\n', modelo.metodo, ...
     modelo.n_bandas, modelo.normalizacao, num2str(modelo.ocultas), modelo.ativacao, num2str(modelo.contexto));
 
-% Descobre quais repeticoes sao de TESTE a partir dos arquivos de teste
-% guardados no modelo (ex.: 'di_005.wav' -> direita no 5; 'es_012.wav' ->
-% esquerda no 12; 'silencio_020.wav' -> silencio no 20).
+% Quais repeticoes sao de teste, pelos nomes guardados no modelo.
+% Ex.: 'di_005.wav' e a direita n. 5; 'es_012.wav', a esquerda n. 12;
+% 'silencio_020.wav', o silencio n. 20.
 num_de = @(nome) str2double(regexprep(nome, '^.*_(\d+)\.wav$', '$1'));
 arqs = modelo.arquivos_teste;
 teste_dir = unique(cellfun(num_de, arqs(strncmp(arqs, 'di_', 3))));
 teste_esq = unique(cellfun(num_de, arqs(strncmp(arqs, 'es_', 3))));
 teste_sil = unique(cellfun(num_de, arqs(strncmp(arqs, 'silencio_', 9))));
 
-%% 2. PARTE 1 - CADA PALAVRA DE TESTE ISOLADA -----------------------------
+%% 2. Parte 1: cada palavra de teste sozinha
 fprintf('=== PARTE 1: palavras de teste isoladas ===\n');
 nomes   = {'direita', 'esquerda'};
 listas  = {teste_dir, teste_esq};
@@ -85,17 +86,17 @@ end
 fprintf('Acerto geral: %.1f%% (%d de %d palavras)\n\n', ...
     100 * trace(T(:, 1:2)) / sum(T(:)), trace(T(:, 1:2)), sum(T(:)));
 
-%% 3. PARTE 2 - FALA CONTINUA SIMULADA ------------------------------------
+%% 3. Parte 2: fala continua simulada
 fprintf('=== PARTE 2: fala continua (palavras de teste emendadas) ===\n');
-% Lista de palavras em ordem aleatoria: [palavra(1/2), numero]
+% Palavras em ordem sorteada: [palavra (1 = direita, 2 = esquerda), numero]
 fila = [ones(numel(teste_dir), 1), teste_dir(:); 2 * ones(numel(teste_esq), 1), teste_esq(:)];
 fila = fila(randperm(size(fila, 1)), :);
 
-% Silencio "de verdade" (ruido da sala) vindo das amostras de TESTE
+% Silencio de verdade (o ruido da sala), tirado das amostras de teste
 sil = [];
 for num = teste_sil(:)'
     [s, fs] = audioread(fullfile(pasta_sil, sprintf('silencio_%03d.wav', num)));
-    sil = [sil; mean(s, 2)]; %#ok<AGROW>
+    sil = [sil; mean(s, 2)];
 end
 n_pausa = round(0.45 * fs);               % pausa de ~0,45 s entre palavras
 
@@ -107,9 +108,9 @@ for i = 1:size(fila, 1)
     pos_sil = mod(pos_sil + n_pausa - 1, numel(sil) - n_pausa) + 1;
     [x, fs] = audioread(fullfile(pasta_palavras, sprintf('%s_%03d.wav', nomes{fila(i,1)}, fila(i,2))));
     x = mean(x, 2);
-    fluxo = [fluxo; pausa]; %#ok<AGROW>
+    fluxo = [fluxo; pausa];
     verdade(i, :) = [fila(i,1), numel(fluxo) / fs, (numel(fluxo) + numel(x)) / fs];
-    fluxo = [fluxo; x]; %#ok<AGROW>
+    fluxo = [fluxo; x];
 end
 fluxo = [fluxo; sil(1:n_pausa)];
 
@@ -175,7 +176,7 @@ xlabel('tempo (s)'); ylabel('classe');
 title('Resposta da rede em cada janela de 150 ms (a maquina de estados procura di>rei>ta ou es>quer>da)');
 saveas(fig, fullfile(pasta_result, 'programa2_fluxo.png')); close(fig);
 
-%% 4. PARTE 3 - ARQUIVO ESCOLHIDO (opcional) ------------------------------
+%% 4. Parte 3: arquivo escolhido (opcional)
 if ~isempty(arquivo_extra)
     fprintf('=== PARTE 3: %s ===\n', arquivo_extra);
     [x, fs] = audioread(arquivo_extra);

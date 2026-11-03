@@ -1,0 +1,149 @@
+%% FIGURAS_RELATORIO.M - figuras do relatorio em PDF
+%
+% Nao e preciso para rodar o projeto: so gera as figuras usadas no
+% relatorio, a partir dos resultados ja salvos.
+%   deteccao_trecho.png  - Figura 1: deteccao das palavras e cortes (10 s)
+%   ondas_cortes.png     - Figura 2: onda de 4 palavras com os cortes
+%   palavra_janelas.png  - Figura 3: resposta da rede janela a janela
+%   matriz_confusao.png  - Figura 4: matriz de confusao do teste
+pasta_rel = fileparts(mfilename('fullpath'));
+pasta_res = fullfile(pasta_rel, '..', 'rede', 'resultados');
+addpath(fullfile(pasta_rel, '..', 'rede'));
+pasta_fig = fullfile(pasta_rel, 'figuras');
+set(0, 'defaultaxesfontsize', 15);  set(0, 'defaulttextfontsize', 15);  % letras legiveis no PDF
+azul  = [42 120 214] / 255;     % cor principal
+cinza = [184 183 176] / 255;    % silencio
+laranja = [235 104 52] / 255;
+tinta = [82 81 78] / 255;
+
+%% 1. Resposta da rede janela a janela numa palavra (Figura 3)
+load(fullfile(pasta_res, 'modelo_final.mat'), 'modelo');
+p.janela = modelo.janela;  p.passo = modelo.passo;  p.n_conf = 1;  p.max_silencio = 0.3;
+pasta_pal = fullfile(pasta_rel, '..', 'segmentacao', 'saida', 'palavras');
+% Procura uma palavra de teste que so foi reconhecida gracas a tolerancia
+num_de = @(nome) str2double(regexprep(nome, '^.*_(\d+)\.wav$', '$1'));
+arqs = modelo.arquivos_teste;
+cand = {};
+for w = {'di_', 'es_'}
+    nums = unique(cellfun(num_de, arqs(strncmp(arqs, w{1}, 3))));
+    pal = 'direita';  if strcmp(w{1}, 'es_'), pal = 'esquerda'; end
+    for num = nums(:)'
+        cand(end+1, :) = {pal, num};
+    end
+end
+escolha = [];
+for i = 1:size(cand, 1)
+    [x, fs] = audioread(fullfile(pasta_pal, sprintf('%s_%03d.wav', cand{i, 1}, cand{i, 2})));
+    x = mean(x, 2);
+    p.max_fora = 0;  r0 = reconhecer_palavra(x, fs, modelo, p);
+    p.max_fora = 2;  [r2, reg] = reconhecer_palavra(x, fs, modelo, p);
+    ok0 = ~isempty(r0) && strcmp(r0(1).palavra, cand{i, 1});
+    ok2 = ~isempty(r2) && strcmp(r2(1).palavra, cand{i, 1});
+    if ~ok0 && ok2 && strcmp(cand{i, 1}, 'direita'), escolha = i; break; end
+end
+if isempty(escolha), escolha = 1; end
+[x, fs] = audioread(fullfile(pasta_pal, sprintf('%s_%03d.wav', cand{escolha, 1}, cand{escolha, 2})));
+x = mean(x, 2);
+p.max_fora = 2;  [r2, reg] = reconhecer_palavra(x, fs, modelo, p);
+fprintf('Palavra do exemplo: %s_%03d\n', cand{escolha, 1}, cand{escolha, 2});
+fprintf('Sequencia: %s\n', strjoin(modelo.classes(reg.classe), ' '));
+fig = figure('Visible', 'off', 'Position', [0 0 1200 700]);
+subplot(2, 1, 1);
+plot((0:numel(x)-1) / fs, x, 'Color', [0.55 0.55 0.55]);
+xlim([0 numel(x) / fs]);  set(gca, 'Box', 'off');
+ylabel('amplitude');  title('audio da palavra');
+subplot(2, 1, 2);  hold on;
+nc = numel(modelo.classes);
+seq = [1 2 3];  if strcmp(cand{escolha, 1}, 'esquerda'), seq = [4 5 6]; end
+for k = 1:numel(reg.t)
+    cor = cinza;  if any(reg.classe(k) == seq), cor = azul; end
+    if reg.classe(k) ~= nc && ~any(reg.classe(k) == seq), cor = laranja; end
+    plot(reg.t(k), reg.classe(k), 'o', 'MarkerSize', 8, 'MarkerFaceColor', cor, 'MarkerEdgeColor', 'w');
+end
+xlim([0 numel(x) / fs]);  ylim([0.5 nc + 0.5]);
+set(gca, 'YTick', 1:nc, 'YTickLabel', modelo.classes, 'YDir', 'reverse', 'Box', 'off');
+grid on;  set(gca, 'XGrid', 'off', 'GridAlpha', 0.15);
+xlabel('tempo (s)');
+title('resposta da rede em cada janela (um ponto a cada 25 ms)');
+saveas(fig, fullfile(pasta_fig, 'palavra_janelas.png'));
+close(fig);
+
+%% 2. Deteccao das palavras nos primeiros 10 s (Figura 1)
+% A mesma curva de volume de segmentar_audios.m (quadros de 20 ms a cada
+% 10 ms, 250 a 6000 Hz, em dB, media de 3 quadros), com os cortes do CSV.
+pasta_seg = fullfile(pasta_rel, '..', 'segmentacao');
+[x, fs] = audioread(fullfile(pasta_seg, 'audios_wav', 'direita.wav'));  x = mean(x, 2);
+C = dlmread(fullfile(pasta_seg, 'saida', 'cortes_direita.csv'), ';', 1, 0);
+J = round(0.020 * fs);  P = round(0.010 * fs);  nq = floor((numel(x) - J) / P) + 1;
+Q = x((1:J)' + (0:nq-1) * P) .* (0.54 - 0.46 * cos(2*pi*(0:J-1)' / (J-1)));
+X = abs(fft(Q)).^2;  X = X(1:floor(J/2)+1, :);  f = (0:floor(J/2))' * fs / J;
+e = movmean(10 * log10(sum(X(f >= 250 & f <= 6000, :), 1) + 1e-10), 3);
+v = sort(e);  piso = v(round(0.10 * numel(v)));
+t = ((0:nq-1) * P + J/2) / fs;
+fig = figure('Visible', 'off', 'Position', [0 0 1200 480]);
+axes('Position', [0.08 0.3 0.9 0.66]);  hold on;
+sel = t >= 0.5 & t <= 10.5;
+for k = 1:size(C, 1)
+    if C(k, 2) > 10.5, break; end
+    patch([C(k,2) C(k,7) C(k,7) C(k,2)], [piso-10 piso-10 max(e)+5 max(e)+5], ...
+          [0.85 0.9 0.97], 'EdgeColor', 'none');
+    plot([1 1] * C(k, 5), [piso-10 max(e)+5], '-', 'Color', laranja, 'LineWidth', 1.2);
+    plot([1 1] * C(k, 6), [piso-10 max(e)+5], '-', 'Color', laranja, 'LineWidth', 1.2);
+end
+h1 = plot(t(sel), e(sel), 'Color', azul, 'LineWidth', 1.2);
+h2 = plot([0.5 10.5], [1 1] * (piso + 15), '--', 'Color', tinta);
+h3 = patch(NaN, NaN, [0.85 0.9 0.97], 'EdgeColor', 'none');
+h4 = plot(NaN, NaN, '-', 'Color', laranja, 'LineWidth', 1.2);
+xlim([0.5 10.5]);  ylim([piso - 10, max(e) + 5]);
+set(gca, 'Box', 'off', 'TickDir', 'out');
+xlabel('tempo (s)');  ylabel('volume (dB)');
+lg = legend([h1 h2 h3 h4], {'volume do som', 'limiar', 'palavra', 'cortes das silabas'}, ...
+       'Orientation', 'horizontal');
+set(lg, 'Position', [0.2 0.02 0.6 0.07]);
+saveas(fig, fullfile(pasta_fig, 'deteccao_trecho.png'));
+close(fig);
+
+%% 3. Onda de 4 palavras com os cortes (Figura 2)
+fig = figure('Visible', 'off', 'Position', [0 0 1200 760]);
+exemplos = {'direita', 1; 'direita', 31; 'esquerda', 1; 'esquerda', 30};
+for i = 1:4
+    pal = exemplos{i, 1};  k = exemplos{i, 2};
+    silabas = {'di', 'rei', 'ta'};  if strcmp(pal, 'esquerda'), silabas = {'es', 'quer', 'da'}; end
+    [x, fs] = audioread(fullfile(pasta_seg, 'audios_wav', [pal '.wav']));  x = mean(x, 2);
+    C = dlmread(fullfile(pasta_seg, 'saida', ['cortes_' pal '.csv']), ';', 1, 0);
+    lim = C(k, [2 5 6 7]);
+    s0 = round((lim(1) - 0.06) * fs);  s1 = round((lim(4) + 0.06) * fs);
+    tt = (s0:s1) / fs;  onda = x(s0:s1);  amp = max(abs(onda));
+    subplot(2, 2, i);  hold on;
+    plot(tt, onda, 'Color', [0.6 0.6 0.6]);
+    env = sqrt(movmean(onda.^2, round(0.010 * fs)));
+    plot(tt, env * amp / max(env), 'Color', azul, 'LineWidth', 1.5);
+    for j = 2:3, plot([1 1] * lim(j), [-1 1] * amp, '-', 'Color', laranja, 'LineWidth', 2.5); end
+    for j = [1 4], plot([1 1] * lim(j), [-1 1] * amp, 'k-', 'LineWidth', 1.5); end
+    for j = 1:3
+        text(mean(lim(j:j+1)), -0.8 * amp, silabas{j}, 'HorizontalAlignment', 'center', ...
+             'FontWeight', 'bold', 'FontSize', 17);
+    end
+    xlim(tt([1 end]));  ylim([-1 1] * amp);  set(gca, 'YTick', [], 'Box', 'off');
+    title(sprintf('"%s" n. %d', pal, k));  xlabel('tempo (s)');
+end
+saveas(fig, fullfile(pasta_fig, 'ondas_cortes.png'));
+close(fig);
+
+%% 4. Matriz de confusao do teste (Figura 4)
+nc = numel(modelo.classes);  MC = zeros(nc);
+for i = 1:numel(modelo.y_teste)
+    MC(modelo.y_teste(i), modelo.prev_teste(i)) = MC(modelo.y_teste(i), modelo.prev_teste(i)) + 1;
+end
+fig = figure('Visible', 'off', 'Position', [0 0 900 760]);
+imagesc(MC ./ sum(MC, 2));  colormap(flipud(gray) * 0.85 + 0.15);  caxis([0 1]);
+set(gca, 'XTick', 1:nc, 'XTickLabel', modelo.classes, 'YTick', 1:nc, 'YTickLabel', modelo.classes);
+for i = 1:nc
+    for j = 1:nc
+        cor = [0 0 0];  if MC(i, j) / sum(MC(i, :)) > 0.5, cor = [1 1 1]; end
+        text(j, i, num2str(MC(i, j)), 'HorizontalAlignment', 'center', 'Color', cor, 'FontSize', 16);
+    end
+end
+xlabel('resposta da rede');  ylabel('silaba dita');
+saveas(fig, fullfile(pasta_fig, 'matriz_confusao.png'));
+close(fig);

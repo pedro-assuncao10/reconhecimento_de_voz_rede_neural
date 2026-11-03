@@ -1,83 +1,91 @@
-%% ========================================================================
-%  EXTRAIR_ENTRADAS.M
-%  ------------------------------------------------------------------------
-%  Transforma o audio nos vetores de entrada da rede: amplitudes das
-%  frequencias (FFT), agrupadas em faixas de 0 a 5 kHz (espectro_bandas.m).
-%  Tambem sorteia quais amostras vao para treino (60%), teste (20%) e
-%  validacao (20%).
+%% EXTRAIR_ENTRADAS.M - transforma o audio nos exemplos de treino da rede
 %
-%  DOIS MODOS de gerar as amostras (variavel 'modo'):
-%    'trechos' - cada silaba recortada inteira vira UMA amostra.
-%    'janelas' - (padrao) cada palavra e percorrida por uma janela deslizante
-%                IGUAL a do programa 2 (mesma duracao e mesmo passo). Cada
-%                janela vira uma amostra, rotulada com a silaba onde cai o
-%                CENTRO da janela. Assim a rede treina com exatamente o tipo
-%                de entrada que vai receber no reconhecimento, e ainda ganha
-%                muito mais exemplos. O silencio tambem e percorrido por
-%                janelas.
+% Cada palavra e percorrida por uma janela de 150 ms que anda 25 ms por
+% vez, a mesma janela do programa 2. Cada janela vira um exemplo de treino:
+%   - entrada: as amplitudes do som em 32 faixas de 0 a 5 kHz (FFT, ver
+%     entrada.m), da janela atual e, com contexto, tambem das vizinhas;
+%   - rotulo: a silaba onde cai o centro da janela.
+% Os trechos de silencio sao percorridos pela mesma janela.
 %
-%  Gera um arquivo por combinacao (metodo de corte x faixas x contexto):
-%    entradas/entradas_<metodo>_<faixas>.mat           (sem contexto)
-%    entradas/entradas_<metodo>_<faixas>_contexto.mat  (com janelas vizinhas)
-%  contendo:
-%    X        - matriz n x (B * numero de janelas de contexto): amplitudes por faixa
-%               da janela atual e das vizinhas (SEM normalizar)
-%    y        - classe de cada amostra (1..7, na ordem de 'classes')
-%    conj     - conjunto de cada amostra: 1 = treino, 2 = teste, 3 = validacao
-%    arquivos - origem de cada amostra, no formato '<silaba>_<repeticao>.wav'
-%    classes, f_min, f_max, n_bandas, fs, modo, janela, passo, contexto
+% Tambem divide as repeticoes em treino (60%), teste (20%) e validacao
+% (20%). A divisao e por palavra: todas as janelas de uma repeticao vao
+% para o mesmo conjunto. Assim nenhum pedaco das palavras de teste aparece
+% no treino, e o programa 2 pode ser testado nelas de forma justa.
 %
-%  IMPORTANTE - divisao por PALAVRA, e nao por amostra:
-%  tudo que vem de uma mesma repeticao (as 3 silabas, ou todas as janelas
-%  dela) vai para o MESMO conjunto. Assim as palavras de teste nunca tiveram
-%  nenhum pedaco visto no treino, e o programa 2 pode ser testado nelas de
-%  forma justa. A divisao e a mesma para os dois metodos de corte.
+% Gera um arquivo para cada combinacao de faixas e contexto:
+%   entradas/entradas_energia_<faixas>.mat            (sem contexto)
+%   entradas/entradas_energia_<faixas>_contexto.mat   (com contexto)
+% com:
+%   X        - uma linha por janela: as faixas da janela atual e das
+%              vizinhas, ainda sem normalizar
+%   y        - classe de cada janela (1 a 7, na ordem de 'classes')
+%   conj     - conjunto de cada janela: 1 = treino, 2 = teste, 3 = validacao
+%   arquivos - de onde veio cada janela, ex.: 'rei_012.wav'
+%   classes, f_min, f_max, n_bandas, fs, modo, janela, passo, contexto
 %
-%  Requisito: rodar antes segmentar_audios.m
-%  ========================================================================
+% As fronteiras das silabas vem do CSV gravado por segmentar_audios.m.
+% Com metodos = {'tercos'}, gera as entradas com os cortes em tercos, que
+% so foram usadas na comparacao do relatorio.
+%
+% Antes, rodar segmentar_audios.m.
 
 clear; clc;
 
-%% 1. CONFIGURACAO ---------------------------------------------------------
+%% 1. Configuracao
 pasta_script   = fileparts(mfilename('fullpath'));
 pasta_seg      = fullfile(pasta_script, '..', 'segmentacao');
 pasta_trechos  = fullfile(pasta_seg, 'saida');
 pasta_entradas = fullfile(pasta_script, 'entradas');
 if ~exist(pasta_entradas, 'dir'), mkdir(pasta_entradas); end
 
-modo         = 'janelas';                      % 'janelas' ou 'trechos'
-janela       = 0.150;                          % duracao da janela (s) - modo 'janelas'
-passo        = 0.025;                          % passo da janela (s)   - modo 'janelas'
-                                               % (o programa 2 usa estes mesmos valores)
-contextos    = {[0], [-4 -2 0 2 4]};           % janelas vizinhas na entrada, em passos:
-                                               %   [0]            = so a janela atual
-                                               %   [-4 -2 0 2 4]  = atual + 50/100 ms antes e depois
-                                               % Gera um arquivo para cada opcao (ver
-                                               % espectro_contexto.m). Modo 'janelas'.
-metodos      = {'energia'};                    % metodo de corte usado (opcoes:
-                                               % 'tercos', 'energia')
+modo         = 'janelas';
+janela       = 0.150;                          % duracao da janela (s)
+passo        = 0.025;                          % quanto a janela anda (s)
+                                               % (o programa 2 usa os mesmos valores)
+contextos    = {[0], [-4 -2 0 2 4]};           % quais janelas entram, contadas em passos:
+                                               %   [0]           = so a janela atual
+                                               %   [-4 -2 0 2 4] = a atual e as vizinhas a
+                                               %                   50 e 100 ms antes e depois
+                                               % (gera um arquivo para cada opcao)
+metodos      = {'energia'};                    % corte das silabas: 'energia' (o usado)
+                                               % ou 'tercos' (so para comparar)
 palavras     = {'direita', 'esquerda'};
 silabas      = {{'di', 'rei', 'ta'}, {'es', 'quer', 'da'}};
 classes      = {'di', 'rei', 'ta', 'es', 'quer', 'da', 'silencio'};
 grupo_classe = [1 1 1 2 2 2 3];                % 1 = direita, 2 = esquerda, 3 = silencio
-lista_bandas = [32 64];                        % numeros de faixas a testar
-f_min = 0;                                     % faixa de frequencia usada:
-f_max = 5000;                                  % 0 a 5 kHz (decisao do projeto)
+lista_bandas = [32 64];                        % numeros de faixas testados (a rede usa 32)
+f_min = 0;                                     % faixa de frequencia: 0 a 5 kHz.
+f_max = 5000;                                  % A voz vai ate ~4,2 kHz (ver o relatorio)
 fracoes = [0.60 0.20 0.20];                    % treino, teste, validacao
 
-rng(42);   % semente fixa: o sorteio sai igual toda vez que rodar
+rng(42);   % semente fixa do sorteio
 
-%% 2. SORTEIO DOS CONJUNTOS (por palavra) ----------------------------------
-% Conta quantas repeticoes existem em cada grupo, olhando a 1a classe dele.
+%% 2. Divisao das repeticoes em treino, teste e validacao
+% O sorteio e feito uma vez so e fica gravado em entradas/divisao.csv. O
+% MATLAB e o Octave sorteiam numeros diferentes com a mesma semente; lendo
+% o arquivo, a divisao e a mesma nos dois.
+
+% Quantas repeticoes tem cada grupo (direita, esquerda, silencio)
 n_grupo = zeros(1, 3);
 for g = 1:3
     c = find(grupo_classe == g, 1);
-    n_grupo(g) = numel(dir(fullfile(pasta_trechos, 'tercos', classes{c}, '*.wav')));
+    n_grupo(g) = numel(dir(fullfile(pasta_trechos, 'energia', classes{c}, '*.wav')));
 end
 
-% Para cada grupo, embaralha os numeros das repeticoes e reparte 60/20/20.
+% Se o arquivo existe, le a divisao dele; senao, embaralha as repeticoes de
+% cada grupo e reparte em 60/20/20.
+arq_divisao = fullfile(pasta_entradas, 'divisao.csv');
 conj_grupo = cell(1, 3);
+if exist(arq_divisao, 'file')
+    T = dlmread(arq_divisao, ';', 1, 0);            % grupo; repeticao; conjunto
+    for g = 1:3
+        conj_grupo{g} = T(T(:, 1) == g, 3);
+        fprintf('Grupo %d: divisao lida de divisao.csv (treino %d, teste %d, validacao %d)\n', g, ...
+            sum(conj_grupo{g} == 1), sum(conj_grupo{g} == 2), sum(conj_grupo{g} == 3));
+    end
+end
 for g = 1:3
+    if ~isempty(conj_grupo{g}), continue; end      % ja veio do arquivo
     n  = n_grupo(g);
     nt = round(fracoes(1) * n);                % quantidade de treino
     ns = round(fracoes(2) * n);                % quantidade de teste
@@ -90,87 +98,76 @@ for g = 1:3
     fprintf('Grupo %d: %d repeticoes -> treino %d, teste %d, validacao %d\n', ...
         g, n, sum(c == 1), sum(c == 2), sum(c == 3));
 end
-
-% No modo 'janelas', le uma vez as gravacoes completas e os cortes de
-% cada palavra (tempos em segundos, salvos por segmentar_audios.m).
-if strcmp(modo, 'janelas')
-    grav = cell(1, 2);  cortes = cell(1, 2);
-    for w = 1:2
-        [x, fs] = audioread(fullfile(pasta_seg, 'audios_wav', [palavras{w} '.wav']));
-        grav{w} = mean(x, 2);
-        % Colunas do CSV: palavra; inicio; A_corte1; A_corte2; B_corte1;
-        % B_corte2; fim; reserva  (separador ';', 1 linha de cabecalho)
-        cortes{w} = dlmread(fullfile(pasta_trechos, ['cortes_' palavras{w} '.csv']), ';', 1, 0);
+if ~exist(arq_divisao, 'file')
+    fid = fopen(arq_divisao, 'w');
+    fprintf(fid, 'grupo;repeticao;conjunto\n');
+    for g = 1:3
+        fprintf(fid, '%d;%d;%d\n', [g * ones(1, numel(conj_grupo{g})); 1:numel(conj_grupo{g}); conj_grupo{g}']);
     end
+    fclose(fid);
 end
 
-%% 3. EXTRACAO DAS ENTRADAS ------------------------------------------------
+% Le as duas gravacoes e os cortes de cada palavra (tempos em segundos,
+% gravados por segmentar_audios.m)
+grav = cell(1, 2);  cortes = cell(1, 2);
+for w = 1:2
+    [x, fs] = audioread(fullfile(pasta_seg, 'audios_wav', [palavras{w} '.wav']));
+    grav{w} = mean(x, 2);
+    % Colunas do CSV: palavra; inicio; A_corte1; A_corte2 (tercos);
+    % B_corte1; B_corte2 (energia); fim; reserva
+    cortes{w} = dlmread(fullfile(pasta_trechos, ['cortes_' palavras{w} '.csv']), ';', 1, 0);
+end
+
+%% 3. Uma linha de X para cada janela
 for m = 1:numel(metodos)
   for nb = lista_bandas
     for ic = 1:numel(contextos)
         contexto = contextos{ic};
         X = []; y = []; conj = []; arquivos = {};
 
-        if strcmp(modo, 'trechos')
-            % ---- Cada silaba recortada = uma amostra --------------------
-            for c = 1:numel(classes)
-                lista = dir(fullfile(pasta_trechos, metodos{m}, classes{c}, '*.wav'));
-                for k = 1:numel(lista)
-                    nome = lista(k).name;
-                    % Numero da repeticao, tirado do nome ('rei_012.wav' -> 12)
-                    num = str2double(regexprep(nome, '^.*_(\d+)\.wav$', '$1'));
-                    [x, fs] = audioread(fullfile(lista(k).folder, nome));
-                    X(end+1, :)  = espectro_bandas(mean(x, 2), fs, nb, f_min, f_max); %#ok<SAGROW>
-                    y(end+1, 1)  = c;                                                 %#ok<SAGROW>
-                    conj(end+1, 1) = conj_grupo{grupo_classe(c)}(num);                %#ok<SAGROW>
-                    arquivos{end+1, 1} = nome;                                        %#ok<SAGROW>
+        J  = round(janela * fs);               % amostras por janela
+        Pp = round(passo  * fs);               % amostras por passo
+        % Colunas dos cortes no CSV: 3 e 4 = tercos, 5 e 6 = energia
+        if strcmp(metodos{m}, 'tercos'), col = [3 4]; else, col = [5 6]; end
+        for w = 1:2
+            xw = grav{w};  C = cortes{w};
+            for k = 1:size(C, 1)
+                num = C(k, 1);
+                t_ini = C(k, 2);  t_fim = C(k, 7);   % limites da palavra (s)
+                c1 = C(k, col(1));  c2 = C(k, col(2)); % fronteiras das silabas (s)
+                % Centro de cada janela: do inicio ao fim da palavra, de 25 em 25 ms
+                for ct = round(t_ini * fs) : Pp : round(t_fim * fs)
+                    a = ct - floor(J/2);               % 1a amostra da janela
+                    if a < 1 || a + J - 1 > numel(xw), continue; end
+                    % Rotulo = silaba onde cai o centro da janela
+                    t = ct / fs;
+                    if t < c1, s = 1; elseif t < c2, s = 2; else, s = 3; end
+                    X(end+1, :) = entrada('espectro', xw, a, J, Pp, contexto, fs, nb, f_min, f_max);
+                    y(end+1, 1) = find(strcmp(classes, silabas{w}{s}));
+                    conj(end+1, 1) = conj_grupo{w}(num);
+                    arquivos{end+1, 1} = sprintf('%s_%03d.wav', silabas{w}{s}, num);
                 end
             end
-
-        else
-            % ---- Janelas deslizantes sobre cada palavra -----------------
-            J  = round(janela * fs);               % amostras por janela
-            Pp = round(passo  * fs);               % amostras por passo
-            col = 2 * m + [1 2];                   % colunas dos cortes deste metodo
-            for w = 1:2
-                xw = grav{w};  C = cortes{w};
-                for k = 1:size(C, 1)
-                    num = C(k, 1);
-                    t_ini = C(k, 2);  t_fim = C(k, 7);   % limites da palavra (s)
-                    c1 = C(k, col(1));  c2 = C(k, col(2)); % fronteiras das silabas (s)
-                    % Centros das janelas: do inicio ao fim da palavra
-                    for ct = round(t_ini * fs) : Pp : round(t_fim * fs)
-                        a = ct - floor(J/2);               % 1a amostra da janela
-                        if a < 1 || a + J - 1 > numel(xw), continue; end
-                        % Rotulo = silaba onde cai o CENTRO da janela
-                        t = ct / fs;
-                        if t < c1, s = 1; elseif t < c2, s = 2; else, s = 3; end
-                        X(end+1, :) = espectro_contexto(xw, a, J, Pp, contexto, fs, nb, f_min, f_max); %#ok<SAGROW>
-                        y(end+1, 1) = find(strcmp(classes, silabas{w}{s}));                    %#ok<SAGROW>
-                        conj(end+1, 1) = conj_grupo{w}(num);                                   %#ok<SAGROW>
-                        arquivos{end+1, 1} = sprintf('%s_%03d.wav', silabas{w}{s}, num);      %#ok<SAGROW>
-                    end
-                end
-            end
-            % Silencio: janelas deslizantes dentro de cada amostra de silencio
-            lista = dir(fullfile(pasta_trechos, metodos{m}, 'silencio', '*.wav'));
-            for k = 1:numel(lista)
-                nome = lista(k).name;
-                num  = str2double(regexprep(nome, '^.*_(\d+)\.wav$', '$1'));
-                [xs, fs] = audioread(fullfile(lista(k).folder, nome));
-                xs = mean(xs, 2);
-                for a = 1 : Pp : numel(xs) - J + 1
-                    X(end+1, :) = espectro_contexto(xs, a, J, Pp, contexto, fs, nb, f_min, f_max); %#ok<SAGROW>
-                    y(end+1, 1) = numel(classes);                                          %#ok<SAGROW>
-                    conj(end+1, 1) = conj_grupo{3}(num);                                   %#ok<SAGROW>
-                    arquivos{end+1, 1} = nome;                                             %#ok<SAGROW>
-                end
+        end
+        % Silencio: a mesma janela percorre cada trecho de silencio
+        lista = dir(fullfile(pasta_trechos, 'energia', 'silencio', '*.wav'));
+        for k = 1:numel(lista)
+            nome = lista(k).name;
+            num  = str2double(regexprep(nome, '^.*_(\d+)\.wav$', '$1'));
+            [xs, fs] = audioread(fullfile(lista(k).folder, nome));
+            xs = mean(xs, 2);
+            for a = 1 : Pp : numel(xs) - J + 1
+                X(end+1, :) = entrada('espectro', xs, a, J, Pp, contexto, fs, nb, f_min, f_max);
+                y(end+1, 1) = numel(classes);
+                conj(end+1, 1) = conj_grupo{3}(num);
+                arquivos{end+1, 1} = nome;
             end
         end
 
         n_bandas = nb;
-        arq = fullfile(pasta_entradas, sprintf('entradas_%s_%d%s.mat', metodos{m}, nb, sufixo_contexto(contexto)));
-        % '-v7' = formato .mat que o MATLAB e o Octave leem igualmente
+        suf = '';  if ~isequal(contexto, 0), suf = '_contexto'; end   % nome do arquivo
+        arq = fullfile(pasta_entradas, sprintf('entradas_%s_%d%s.mat', metodos{m}, nb, suf));
+        % '-v7' = formato de .mat que o MATLAB e o Octave leem do mesmo jeito
         save(arq, 'X', 'y', 'conj', 'arquivos', 'classes', 'f_min', 'f_max', ...
              'n_bandas', 'fs', 'modo', 'janela', 'passo', 'contexto', '-v7');
         fprintf('%-8s %2d faixas contexto [%s]: %d amostras (treino %d, teste %d, validacao %d)\n', ...
