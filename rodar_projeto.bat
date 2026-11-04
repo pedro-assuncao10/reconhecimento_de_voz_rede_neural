@@ -12,7 +12,7 @@ title Reconhecimento de DIREITA e ESQUERDA - rede neural MLP
 echo.
 echo  Reconhecimento das palavras DIREITA e ESQUERDA com rede neural MLP
 echo  ------------------------------------------------------------------
-echo   1 - rodar o programa 2 com a rede ja treinada  [cerca de 1 minuto]
+echo   1 - rodar o programa 2 com a rede ja treinada  [cerca de 3 minutos]
 echo   2 - refazer tudo do zero: segmentacao, treino e programa 2  [cerca de 10 minutos]
 echo.
 choice /c 12 /n /m "Escolha 1 ou 2: "

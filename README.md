@@ -8,7 +8,7 @@ Reconhecimento das palavras DIREITA e ESQUERDA com uma MLP escrita à mão em MA
 
 **Dentro do MATLAB ou do Octave:** abra esta pasta no MATLAB (R2016b ou mais novo) ou no GNU Octave (6 ou mais novo) e rode:
 
-- `rodar_projeto`: confere o ambiente e roda o programa 2 com a rede já treinada (cerca de 1 minuto);
+- `rodar_projeto`: confere o ambiente e roda o programa 2 com a rede já treinada (cerca de 3 minutos; se as palavras ainda não foram cortadas, roda a segmentação antes);
 - `rodar_projeto('tudo')`: confere o ambiente e refaz tudo do zero, da segmentação ao programa 2 (cerca de 10 minutos).
 
 O projeto usa só funções básicas (`audioread`, `fft`, `movmean`...), sem toolbox e sem pacote extra; não é preciso baixar nada. A divisão treino/validação/teste fica gravada em `rede/entradas/divisao.csv`, para ser a mesma no MATLAB e no Octave. O treino sorteia os pesos iniciais, e o MATLAB sorteia números diferentes do Octave: ao refazer o treino no MATLAB, o acerto pode variar uma ou duas palavras.
@@ -41,7 +41,7 @@ Os resultados e as justificativas de cada escolha estão em `rede/resultados/REL
 ## Pastas
 
 - `material do professor/`: enunciado, slides e gravações originais (.aac)
-- `segmentacao/audios_wav/`: gravações convertidas para WAV (o Octave não lê .aac)
+- `segmentacao/audios/`: as duas gravações em FLAC, sem perda (o Octave não lê .aac)
 - `segmentacao/saida/`: palavras inteiras, sílabas, silêncios, CSV dos cortes e figuras
 - `rede/`: a MLP (`mlp.m`), a entrada da rede (`entrada.m`: FFT em faixas, contexto e normalização), extração, treino, programa 2 e experimentos
 - `rede/resultados/`: rede final, figuras, relatório e dados dos experimentos

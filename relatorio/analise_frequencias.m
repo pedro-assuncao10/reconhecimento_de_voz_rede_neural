@@ -22,7 +22,7 @@ dur_q = 0.020;  dur_p = 0.010;
 
 Pf = 0;  Pn = 0;  nf = 0;  nn = 0;
 for w = 1:2
-    [x, fs] = audioread(fullfile(pasta_seg, 'audios_wav', [palavras{w} '.wav']));
+    [x, fs] = audioread(fullfile(pasta_seg, 'audios', [palavras{w} '.flac']));
     x = mean(x, 2);
     C = dlmread(fullfile(pasta_seg, 'saida', ['cortes_' palavras{w} '.csv']), ';', 1, 0);
     J = round(dur_q * fs);  P = round(dur_p * fs);

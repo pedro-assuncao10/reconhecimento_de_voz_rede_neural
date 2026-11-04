@@ -72,7 +72,7 @@ close(fig);
 % A mesma curva de volume de segmentar_audios.m (quadros de 20 ms a cada
 % 10 ms, 250 a 6000 Hz, em dB, media de 3 quadros), com os cortes do CSV.
 pasta_seg = fullfile(pasta_rel, '..', 'segmentacao');
-[x, fs] = audioread(fullfile(pasta_seg, 'audios_wav', 'direita.wav'));  x = mean(x, 2);
+[x, fs] = audioread(fullfile(pasta_seg, 'audios', 'direita.flac'));  x = mean(x, 2);
 C = dlmread(fullfile(pasta_seg, 'saida', 'cortes_direita.csv'), ';', 1, 0);
 J = round(0.020 * fs);  P = round(0.010 * fs);  nq = floor((numel(x) - J) / P) + 1;
 Q = x((1:J)' + (0:nq-1) * P) .* (0.54 - 0.46 * cos(2*pi*(0:J-1)' / (J-1)));
@@ -109,7 +109,7 @@ exemplos = {'direita', 1; 'direita', 31; 'esquerda', 1; 'esquerda', 30};
 for i = 1:4
     pal = exemplos{i, 1};  k = exemplos{i, 2};
     silabas = {'di', 'rei', 'ta'};  if strcmp(pal, 'esquerda'), silabas = {'es', 'quer', 'da'}; end
-    [x, fs] = audioread(fullfile(pasta_seg, 'audios_wav', [pal '.wav']));  x = mean(x, 2);
+    [x, fs] = audioread(fullfile(pasta_seg, 'audios', [pal '.flac']));  x = mean(x, 2);
     C = dlmread(fullfile(pasta_seg, 'saida', ['cortes_' pal '.csv']), ';', 1, 0);
     lim = C(k, [2 5 6 7]);
     s0 = round((lim(1) - 0.06) * fs);  s1 = round((lim(4) + 0.06) * fs);

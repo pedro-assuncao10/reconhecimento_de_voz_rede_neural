@@ -111,7 +111,7 @@ end
 % gravados por segmentar_audios.m)
 grav = cell(1, 2);  cortes = cell(1, 2);
 for w = 1:2
-    [x, fs] = audioread(fullfile(pasta_seg, 'audios_wav', [palavras{w} '.wav']));
+    [x, fs] = audioread(fullfile(pasta_seg, 'audios', [palavras{w} '.flac']));
     grav{w} = mean(x, 2);
     % Colunas do CSV: palavra; inicio; A_corte1; A_corte2 (tercos);
     % B_corte1; B_corte2 (energia); fim; reserva

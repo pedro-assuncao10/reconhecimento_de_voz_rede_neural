@@ -9,7 +9,8 @@ Pedro Lima de Assunção Filho - Redes Neurais
 
        rodar_projeto
 
-   Isso roda o programa 2 com a rede já treinada (cerca de 1 minuto).
+   Isso corta os áudios em palavras e sílabas e roda o programa 2 com a
+   rede já treinada (cerca de 3 minutos).
    Para refazer tudo do zero (segmentação dos áudios, treino da rede e
    programa 2, cerca de 10 minutos), digite:
 

@@ -32,13 +32,15 @@ clear; clc; close all;
 pasta_script = fileparts(mfilename('fullpath'));
 
 % Lista de gravacoes: nome da palavra, arquivo original (.aac) e a copia
-% em .wav (a que e usada; o .aac so se o .wav nao existir).
+% em .flac, que e a usada. O .flac e um formato sem perda (as amostras sao
+% exatamente as do audio original) que o MATLAB e o Octave leem direto; o
+% Octave nao le .aac. O .aac so e usado se o .flac nao existir.
 gravacoes = struct( ...
     'palavra', {'direita', 'esquerda'}, ...
     'arquivo', {fullfile(pasta_script, '..', 'material do professor', 'direita_-_68.aac'), ...
                 fullfile(pasta_script, '..', 'material do professor', 'esquerda_-_73.aac')}, ...
-    'arquivo_wav', {fullfile(pasta_script, 'audios_wav', 'direita.wav'), ...
-                    fullfile(pasta_script, 'audios_wav', 'esquerda.wav')}, ...
+    'arquivo_audio', {fullfile(pasta_script, 'audios', 'direita.flac'), ...
+                      fullfile(pasta_script, 'audios', 'esquerda.flac')}, ...
     'silabas', {{'di', 'rei', 'ta'}, {'es', 'quer', 'da'}});
 
 % Curva de volume: o audio e dividido em pedacos curtos (quadros)
@@ -112,12 +114,11 @@ for g = 1:numel(gravacoes)
     fprintf('\n=== Processando "%s" ===\n', palavra);
 
     % 2.1 Leitura do audio
-    % Usa a copia .wav (o Octave nao le .aac, e cada programa decodifica o
-    % .aac de um jeito; com o .wav o resultado e o mesmo em qualquer um).
-    % Sem o .wav, tenta o .aac original.
-    if exist(gravacoes(g).arquivo_wav, 'file')
-        [x, fs] = audioread(gravacoes(g).arquivo_wav);
-        fprintf('Lido: %s\n', gravacoes(g).arquivo_wav);
+    % Usa a copia .flac (cada programa decodifica o .aac de um jeito; com o
+    % .flac o resultado e o mesmo em qualquer um). Sem ela, tenta o .aac.
+    if exist(gravacoes(g).arquivo_audio, 'file')
+        [x, fs] = audioread(gravacoes(g).arquivo_audio);
+        fprintf('Lido: %s\n', gravacoes(g).arquivo_audio);
     else
         [x, fs] = audioread(gravacoes(g).arquivo);
         fprintf('Lido: %s\n', gravacoes(g).arquivo);

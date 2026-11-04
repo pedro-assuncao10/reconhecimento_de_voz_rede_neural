@@ -5,7 +5,8 @@ function rodar_projeto(modo)
     % Uso (com esta pasta aberta no MATLAB ou no Octave):
     %   rodar_projeto            confere e roda o programa 2 com a rede ja
     %                            treinada (rede/resultados/modelo_final.mat),
-    %                            cerca de 1 minuto
+    %                            cerca de 3 minutos. Se as palavras ainda nao
+    %                            foram cortadas, roda a segmentacao antes
     %   rodar_projeto('tudo')    confere e refaz tudo do zero: segmentacao,
     %                            entradas da rede, treino e programa 2,
     %                            cerca de 10 minutos
@@ -42,11 +43,10 @@ function rodar_projeto(modo)
     fprintf('Toolboxes / pacotes extras: nenhum e necessario\n');
 
     % Arquivos de entrada
-    precisa = {fullfile('segmentacao', 'audios_wav', 'direita.wav'), ...
-               fullfile('segmentacao', 'audios_wav', 'esquerda.wav')};
+    precisa = {fullfile('segmentacao', 'audios', 'direita.flac'), ...
+               fullfile('segmentacao', 'audios', 'esquerda.flac')};
     if ~strcmp(modo, 'tudo')
         precisa{end+1} = fullfile('rede', 'resultados', 'modelo_final.mat');
-        precisa{end+1} = fullfile('segmentacao', 'saida', 'palavras', 'direita_001.wav');
     end
     for i = 1:numel(precisa)
         if ~exist(fullfile(raiz, precisa{i}), 'file')
@@ -56,8 +56,13 @@ function rodar_projeto(modo)
     fprintf('Arquivos de entrada: ok\n');
 
     %% 2. Roda
-    if strcmp(modo, 'tudo')
+    % As palavras, silabas e silencios cortados (segmentacao/saida) sao
+    % gerados pela segmentacao. Sem eles, ela roda antes do programa 2.
+    ja_cortado = exist(fullfile(raiz, 'segmentacao', 'saida', 'palavras', 'direita_001.wav'), 'file');
+    if strcmp(modo, 'tudo') || ~ja_cortado
         executar('segmentacao', 'segmentar_audios');   % palavras, silabas e silencios
+    end
+    if strcmp(modo, 'tudo')
         executar('rede', 'extrair_entradas');          % vetores de entrada da rede
         executar('rede', 'treinar_mlp');               % treino e teste da rede
     end
