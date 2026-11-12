@@ -2,41 +2,37 @@
 Reconhecimento das palavras DIREITA e ESQUERDA com redes neurais MLP e RBF
 Pedro Lima de Assunção Filho - Redes Neurais
 
-O projeto tem as duas redes dos dois trabalhos:
-   - MLP (primeiro trabalho): pasta rede/
-   - RBF (segundo trabalho, "Kohonen ou RBF"): pasta rede_rbf/
-As duas usam a mesma segmentação dos áudios e o mesmo programa de
-reconhecimento das palavras (programa 2).
+O projeto tem as duas redes dos dois trabalhos, cada uma na sua pasta e
+com o seu próprio rodar_projeto:
+   - rede_mlp/   MLP (primeiro trabalho)
+   - rede_rbf/   RBF (segundo trabalho, "Kohonen ou RBF")
+A pasta segmentacao/ é a mesma para as duas: ela corta os áudios em
+palavras, sílabas e silêncios.
 
 
 1) NO MATLAB (R2016b ou mais novo) OU NO GNU OCTAVE (6 ou mais novo)
 
-   Abra esta pasta e digite na janela de comandos:
+   Abra a pasta da rede (rede_mlp ou rede_rbf) e digite na janela de
+   comandos:
 
-       rodar_projeto              rede MLP já treinada (cerca de 3 minutos)
-       rodar_projeto('rbf')       rede RBF já treinada (cerca de 3 minutos)
-
-   Os dois cortam os áudios em palavras e sílabas e rodam o programa 2.
-   Para refazer tudo do zero (segmentação, treino da rede e programa 2,
-   cerca de 10 minutos):
-
-       rodar_projeto('tudo')      com a MLP
-       rodar_projeto('rbf_tudo')  com a RBF
+       rodar_projeto              rede já treinada (cerca de 3 minutos)
+       rodar_projeto('tudo')      refaz tudo do zero: segmentação, treino
+                                  da rede e programa 2 (cerca de 10 minutos)
 
    Não é preciso instalar nenhuma toolbox.
 
 
 2) NO WINDOWS, SEM MATLAB E SEM OCTAVE
 
-   Dê dois cliques no arquivo:
+   Dê dois cliques no rodar_projeto.bat de dentro da pasta da rede:
 
-       rodar_projeto.bat
+       rede_mlp\rodar_projeto.bat
+       rede_rbf\rodar_projeto.bat
 
    Ele procura o MATLAB ou o Octave no computador. Se não encontrar
    nenhum dos dois, pergunta se pode instalar o GNU Octave (gratuito,
    cerca de 400 MB) e, depois, roda o projeto. No começo, ele pergunta
-   qual rede (MLP ou RBF) e se é para rodar só o programa 2 ou refazer
-   tudo.
+   se é para rodar só o programa 2 ou refazer tudo.
 
 
 RESULTADO ESPERADO
@@ -49,7 +45,7 @@ RESULTADO ESPERADO
       Palavras de teste isoladas: 12 de 14 (85,7%)
       Fala contínua:              13 de 14 (92,9%)
 
-   As figuras ficam em rede/resultados/ e rede_rbf/resultados/.
+   As figuras ficam em rede_mlp/resultados/ e rede_rbf/resultados/.
    Os relatórios estão na pasta relatorio/.
 
    Ao refazer tudo no MATLAB, o resultado pode variar uma ou duas

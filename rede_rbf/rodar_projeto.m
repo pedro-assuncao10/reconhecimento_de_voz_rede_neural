@@ -1,27 +1,27 @@
 function rodar_projeto(modo)
     % RODAR_PROJETO  Confere se o MATLAB/Octave tem tudo o que o projeto usa
-    % e roda o projeto.
+    % e roda o reconhecimento com a rede RBF.
     %
-    % Uso (com esta pasta aberta no MATLAB ou no Octave):
+    % Uso (com a pasta rede_rbf aberta no MATLAB ou no Octave):
     %   rodar_projeto            confere e roda o programa 2 com a rede ja
-    %                            treinada (rede/resultados/modelo_final.mat),
+    %                            treinada (resultados/modelo_final.mat),
     %                            cerca de 3 minutos. Se as palavras ainda nao
     %                            foram cortadas, roda a segmentacao antes
     %   rodar_projeto('tudo')    confere e refaz tudo do zero: segmentacao,
     %                            entradas da rede, treino e programa 2,
     %                            cerca de 10 minutos
-    %   rodar_projeto('rbf')     o mesmo que o primeiro, com a rede RBF
-    %                            (rede_rbf/resultados/modelo_final.mat)
-    %   rodar_projeto('rbf_tudo') o mesmo que 'tudo', com a rede RBF
+    %
+    % A segmentacao (pasta segmentacao, ao lado desta) e a mesma para as
+    % duas redes.
     %
     % O projeto usa so funcoes basicas do MATLAB/Octave (audioread, fft,
     % movmean, ...), sem toolbox e sem pacote extra: nao e preciso baixar
     % nada. Este script so confirma isso antes de comecar.
 
     if nargin < 1, modo = 'programa2'; end
-    raiz = fileparts(mfilename('fullpath'));
-    rbf  = strncmp(modo, 'rbf', 3);                       % rede RBF ou MLP
-    tudo = any(strcmp(modo, {'tudo', 'rbf_tudo'}));       % refaz tudo do zero?
+    tudo = strcmp(modo, 'tudo');                          % refaz tudo do zero?
+    pasta = fileparts(mfilename('fullpath'));             % pasta rede_rbf
+    raiz  = fullfile(pasta, '..');                        % pasta do projeto
 
     %% 1. Confere o ambiente
     fprintf('=== Conferindo o ambiente ===\n');
@@ -48,16 +48,14 @@ function rodar_projeto(modo)
     fprintf('Toolboxes / pacotes extras: nenhum e necessario\n');
 
     % Arquivos de entrada
-    precisa = {fullfile('segmentacao', 'audios', 'direita.flac'), ...
-               fullfile('segmentacao', 'audios', 'esquerda.flac')};
-    if ~tudo && rbf
-        precisa{end+1} = fullfile('rede_rbf', 'resultados', 'modelo_final.mat');
-    elseif ~tudo
-        precisa{end+1} = fullfile('rede', 'resultados', 'modelo_final.mat');
+    precisa = {fullfile(raiz, 'segmentacao', 'audios', 'direita.flac'), ...
+               fullfile(raiz, 'segmentacao', 'audios', 'esquerda.flac')};
+    if ~tudo
+        precisa{end+1} = fullfile(pasta, 'resultados', 'modelo_final.mat');
     end
     for i = 1:numel(precisa)
-        if ~exist(fullfile(raiz, precisa{i}), 'file')
-            error('Arquivo nao encontrado: %s (rode com ''tudo'' ou ''rbf_tudo'')', precisa{i});
+        if ~exist(precisa{i}, 'file')
+            error('Arquivo nao encontrado: %s (rode com ''tudo'')', precisa{i});
         end
     end
     fprintf('Arquivos de entrada: ok\n');
@@ -70,23 +68,13 @@ function rodar_projeto(modo)
         executar('segmentacao', 'segmentar_audios');   % palavras, silabas e silencios
     end
     if tudo
-        executar('rede', 'extrair_entradas');          % vetores de entrada da rede
-    end
-    if tudo && rbf
+        executar('rede_rbf', 'extrair_entradas');      % vetores de entrada da rede
         executar('rede_rbf', 'treinar_rbf');           % treino e teste da RBF
-    elseif tudo
-        executar('rede', 'treinar_mlp');               % treino e teste da MLP
     end
-    if rbf
-        executar('rede', 'programa2_reconhecer(''rbf'')');   % reconhecimento com a RBF
-        pasta_res = 'rede_rbf/resultados/';
-    else
-        executar('rede', 'programa2_reconhecer');            % reconhecimento com a MLP
-        pasta_res = 'rede/resultados/';
-    end
+    executar('rede_rbf', 'programa2_reconhecer');      % reconhecimento das palavras
 
-    cd(fileparts(mfilename('fullpath')));
-    fprintf('\nPronto. Resultados e figuras em %s\n', pasta_res);
+    cd(pasta);
+    fprintf('\nPronto. Resultados e figuras em rede_rbf/resultados/\n');
 end
 
 
@@ -94,6 +82,6 @@ function executar(pasta, script)
     % EXECUTAR  Roda um dos scripts do projeto dentro da pasta dele (onde
     % estao as funcoes que ele usa).
     fprintf('\n=== %s: %s ===\n', pasta, script);
-    cd(fullfile(fileparts(mfilename('fullpath')), pasta));
+    cd(fullfile(fileparts(mfilename('fullpath')), '..', pasta));
     eval(script);
 end

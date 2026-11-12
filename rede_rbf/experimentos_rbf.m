@@ -35,7 +35,6 @@ function experimentos_rbf(acao, varargin)
     %   3) se empatar tambem, a opcao mais simples.
 
     pasta = fileparts(mfilename('fullpath'));
-    addpath(fullfile(pasta, '..', 'rede'));        % entrada.m e reconhecer_palavra.m
     switch acao
         case 'etapa',                    etapa(varargin{:});
         case 'resumo',                   resumo(varargin{:});
@@ -78,7 +77,7 @@ function D = carregar(pasta, c)
     % CARREGAR  Entradas da combinacao de faixas e contexto, com a divisao
     % 75/15/10 da RBF.
     suf = '';  if ~isequal(c.contexto, 0), suf = '_contexto'; end
-    D = load(fullfile(pasta, '..', 'rede', 'entradas', sprintf('entradas_energia_%d%s.mat', c.faixas, suf)));
+    D = load(fullfile(pasta, 'entradas', sprintf('entradas_energia_%d%s.mat', c.faixas, suf)));
     D = rbf('dividir', D);
 end
 

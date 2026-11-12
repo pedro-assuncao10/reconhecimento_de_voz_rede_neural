@@ -22,14 +22,13 @@
 %   modelo_final.mat    - a rede escolhida e tudo que o programa 2 precisa
 %   matriz_confusao.png - acertos e trocas de cada classe no teste
 %
-% Antes, rodar segmentar_audios.m e extrair_entradas.m (pasta rede/).
+% Antes, rodar segmentar_audios.m e extrair_entradas.m.
 
 clear; clc; close all;
 
 %% 1. Configuracao
 pasta_script = fileparts(mfilename('fullpath'));
-addpath(fullfile(pasta_script, '..', 'rede'));    % entrada.m e reconhecer_palavra.m
-pasta_entradas = fullfile(pasta_script, '..', 'rede', 'entradas');
+pasta_entradas = fullfile(pasta_script, 'entradas');
 pasta_result   = fullfile(pasta_script, 'resultados');
 pasta_palavras = fullfile(pasta_script, '..', 'segmentacao', 'saida', 'palavras');
 if ~exist(pasta_result, 'dir'), mkdir(pasta_result); end

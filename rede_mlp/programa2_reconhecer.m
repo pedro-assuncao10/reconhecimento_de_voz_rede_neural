@@ -1,4 +1,4 @@
-function programa2_reconhecer(tipo)
+function programa2_reconhecer()
     % PROGRAMA2_RECONHECER  Programa 2: reconhecimento das palavras
     %
     % Reconhece as palavras inteiras DIREITA e ESQUERDA usando a rede treinada
@@ -16,26 +16,16 @@ function programa2_reconhecer(tipo)
     %
     % Saida (pasta resultados/): programa2_fluxo.png, o grafico da Parte 2.
     %
-    % Uso:
-    %   programa2_reconhecer          com a rede MLP (rede/resultados/)
-    %   programa2_reconhecer('rbf')   com a rede RBF (rede_rbf/resultados/)
-    %
-    % Antes, rodar segmentar_audios.m e o treino da rede (treinar_mlp.m ou
-    % treinar_rbf.m), ou usar a rede que ja esta salva em modelo_final.mat.
+    % Antes, rodar segmentar_audios.m e treinar_mlp.m, ou usar a rede que ja
+    % esta salva em resultados/modelo_final.mat.
 
-    if nargin < 1, tipo = 'mlp'; end
     close all;
 
     %% 1. Configuracao
     pasta_script   = fileparts(mfilename('fullpath'));
     pasta_palavras = fullfile(pasta_script, '..', 'segmentacao', 'saida', 'palavras');
     pasta_sil      = fullfile(pasta_script, '..', 'segmentacao', 'saida', 'energia', 'silencio');
-    if strcmp(tipo, 'rbf')
-        pasta_result = fullfile(pasta_script, '..', 'rede_rbf', 'resultados');
-        addpath(fullfile(pasta_script, '..', 'rede_rbf'));   % rbf.m
-    else
-        pasta_result = fullfile(pasta_script, 'resultados');
-    end
+    pasta_result   = fullfile(pasta_script, 'resultados');
 
     % Parte 3: caminho de um .wav para reconhecer ('' = nao usar)
     arquivo_extra = '';
@@ -58,14 +48,8 @@ function programa2_reconhecer(tipo)
                              % (erro isolado da rede). Uma silaba falada ocupa
                              % de 6 a 10 janelas, entao uma silaba trocada de
                              % verdade continua reprovando a palavra
-    if strcmp(tipo, 'rbf')
-        fprintf('Rede RBF: %d faixas | %s | %d neuronios | centros %s | abertura %s | saida %s %s | contexto [%s]\n\n', ...
-            modelo.n_bandas, modelo.normalizacao, size(modelo.rede.C, 1), modelo.opcoes.centros, ...
-            modelo.opcoes.largura, modelo.opcoes.saida, modelo.opcoes.ativ_saida, num2str(modelo.contexto));
-    else
-        fprintf('Rede MLP: metodo %s | %d faixas | %s | ocultas [%s] | %s | contexto [%s]\n\n', modelo.metodo, ...
-            modelo.n_bandas, modelo.normalizacao, num2str(modelo.ocultas), modelo.ativacao, num2str(modelo.contexto));
-    end
+    fprintf('Rede MLP: metodo %s | %d faixas | %s | ocultas [%s] | %s | contexto [%s]\n\n', modelo.metodo, ...
+        modelo.n_bandas, modelo.normalizacao, num2str(modelo.ocultas), modelo.ativacao, num2str(modelo.contexto));
 
     % Quais repeticoes sao de teste, pelos nomes guardados no modelo.
     % Ex.: 'di_005.wav' e a direita n. 5; 'es_012.wav', a esquerda n. 12;

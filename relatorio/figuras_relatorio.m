@@ -7,8 +7,8 @@
 %   palavra_janelas.png  - Figura 3: resposta da rede janela a janela
 %   matriz_confusao.png  - Figura 4: matriz de confusao do teste
 pasta_rel = fileparts(mfilename('fullpath'));
-pasta_res = fullfile(pasta_rel, '..', 'rede', 'resultados');
-addpath(fullfile(pasta_rel, '..', 'rede'));
+pasta_res = fullfile(pasta_rel, '..', 'rede_mlp', 'resultados');
+addpath(fullfile(pasta_rel, '..', 'rede_mlp'));
 pasta_fig = fullfile(pasta_rel, 'figuras');
 set(0, 'defaultaxesfontsize', 15);  set(0, 'defaulttextfontsize', 15);  % letras legiveis no PDF
 azul  = [42 120 214] / 255;     % cor principal
@@ -175,7 +175,7 @@ close(fig);
 %% 6. Rede RBF: erro da regra delta a cada epoca, com taxas e momento diferentes
 % Mesma camada escondida da RBF escolhida (200 centros pelo WTA, raio unico
 % 0,5 dmax, db); so muda o treino dos pesos da saida (saida linear).
-Dr = rbf('dividir', load(fullfile(pasta_rel, '..', 'rede', 'entradas', 'entradas_energia_32_contexto.mat')));
+Dr = rbf('dividir', load(fullfile(pasta_rel, '..', 'rede_rbf', 'entradas', 'entradas_energia_32_contexto.mat')));
 tr = Dr.conj == 1;  va = Dr.conj == 3;
 [Xtr, st] = entrada('normalizar', Dr.X(tr, :), 'db');  Xva = entrada('normalizar', Dr.X(va, :), 'db', st);
 rng(1);

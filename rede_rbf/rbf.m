@@ -249,7 +249,7 @@ function D = dividir(D)
     % validacao 15%, teste 10%, por repeticao da palavra (todas as janelas
     % de uma repeticao vao para o mesmo conjunto). O sorteio e feito uma vez
     % e fica gravado em divisao_rbf.csv, para ser o mesmo no MATLAB e no
-    % Octave. Troca o campo D.conj (1 = treino, 2 = teste, 3 = validacao).
+    % Octave. Grava o campo D.conj (1 = treino, 2 = teste, 3 = validacao).
     arq = fullfile(fileparts(mfilename('fullpath')), 'divisao_rbf.csv');
     grupo = 1 + (D.y >= 4) + (D.y == 7);           % 1 direita, 2 esquerda, 3 silencio
     num = cellfun(@(a) str2double(regexprep(a, '^.*_(\d+)\.wav$', '$1')), D.arquivos);
@@ -272,6 +272,7 @@ function D = dividir(D)
         fprintf(fid, '%d;%d;%d\n', T');
         fclose(fid);
     end
+    D.conj = zeros(size(D.y));
     for g = 1:3
         tg = T(T(:, 1) == g, :);
         sel = grupo == g;

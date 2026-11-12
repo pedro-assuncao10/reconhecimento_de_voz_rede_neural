@@ -11,9 +11,9 @@ Documento de trabalho da rede RBF (base do relatório em PDF). Segue o enunciado
 | Reconhecer as sílabas DI, REI, TA, ES, QUER, DA das palavras DIREITA e ESQUERDA | 6 sílabas + silêncio (7 classes), as mesmas da MLP |
 | Separar as sílabas dos áudios | mesma segmentação da MLP (cortes nos vales de energia, automática) |
 | **Treino 75%, validação 15%, teste 10%** | divisão por repetição da palavra: 51/10/7 "direita", 55/11/7 "esquerda", 86/17/11 silêncios; 2.963 / 590 / 408 janelas. Gravada em `rede_rbf/divisao_rbf.csv` |
-| Ler os áudios com `audioread` e salvar em arquivo `.mat` | as mesmas entradas da MLP (`rede/entradas/*.mat`) |
+| Ler os áudios com `audioread` e salvar em arquivo `.mat` | as mesmas entradas da MLP, geradas pelo `extrair_entradas.m` da própria pasta (`rede_rbf/entradas/*.mat`) |
 | FFT e média das amplitudes por grupo de frequências | 32 faixas de 156 Hz, de 0 a 5 kHz, com contexto (janelas vizinhas) |
-| Programa de treino e programa de reconhecimento das palavras | `treinar_rbf.m` e `programa2_reconhecer('rbf')` (a mesma máquina de estados da MLP) |
+| Programa de treino e programa de reconhecimento das palavras | `treinar_rbf.m` e `programa2_reconhecer.m` da pasta `rede_rbf` (a mesma máquina de estados da MLP); tudo roda com `rodar_projeto` dentro da pasta |
 | Códigos comentados | sim |
 | Algoritmo de treino (slide 14): normalizar → centros → aberturas → congelar → pesos da saída | `rbf.m`, função `treinar`, nessa ordem |
 | Gaussiana: out_i = exp(−‖x − c_i‖² / 2σ_i²), norma euclidiana (slides 4 e 5) | `rbf.m`, função `ativar` |
