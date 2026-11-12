@@ -1,30 +1,32 @@
 ﻿COMO RODAR O PROJETO
-Reconhecimento das palavras DIREITA e ESQUERDA com rede neural MLP
+Reconhecimento das palavras DIREITA e ESQUERDA com redes neurais MLP e RBF
 Pedro Lima de Assunção Filho - Redes Neurais
 
+O projeto tem as duas redes dos dois trabalhos:
+   - MLP (primeiro trabalho): pasta rede/
+   - RBF (segundo trabalho, "Kohonen ou RBF"): pasta rede_rbf/
+As duas usam a mesma segmentação dos áudios e o mesmo programa de
+reconhecimento das palavras (programa 2).
 
-1) NO MATLAB (R2016b ou mais novo)
 
-   Abra esta pasta no MATLAB e digite na janela de comandos:
+1) NO MATLAB (R2016b ou mais novo) OU NO GNU OCTAVE (6 ou mais novo)
 
-       rodar_projeto
+   Abra esta pasta e digite na janela de comandos:
 
-   Isso corta os áudios em palavras e sílabas e roda o programa 2 com a
-   rede já treinada (cerca de 3 minutos).
-   Para refazer tudo do zero (segmentação dos áudios, treino da rede e
-   programa 2, cerca de 10 minutos), digite:
+       rodar_projeto              rede MLP já treinada (cerca de 3 minutos)
+       rodar_projeto('rbf')       rede RBF já treinada (cerca de 3 minutos)
 
-       rodar_projeto('tudo')
+   Os dois cortam os áudios em palavras e sílabas e rodam o programa 2.
+   Para refazer tudo do zero (segmentação, treino da rede e programa 2,
+   cerca de 10 minutos):
+
+       rodar_projeto('tudo')      com a MLP
+       rodar_projeto('rbf_tudo')  com a RBF
 
    Não é preciso instalar nenhuma toolbox.
 
 
-2) NO GNU OCTAVE (6 ou mais novo)
-
-   Os mesmos comandos do item 1, dentro do Octave.
-
-
-3) NO WINDOWS, SEM MATLAB E SEM OCTAVE
+2) NO WINDOWS, SEM MATLAB E SEM OCTAVE
 
    Dê dois cliques no arquivo:
 
@@ -32,18 +34,25 @@ Pedro Lima de Assunção Filho - Redes Neurais
 
    Ele procura o MATLAB ou o Octave no computador. Se não encontrar
    nenhum dos dois, pergunta se pode instalar o GNU Octave (gratuito,
-   cerca de 400 MB) e, depois, roda o projeto. No começo, ele pergunta se
-   é para rodar só o programa 2 (opção 1) ou refazer tudo (opção 2).
+   cerca de 400 MB) e, depois, roda o projeto. No começo, ele pergunta
+   qual rede (MLP ou RBF) e se é para rodar só o programa 2 ou refazer
+   tudo.
 
 
 RESULTADO ESPERADO
 
-   Palavras de teste isoladas: 24 de 29 (82,8%)
-   Fala contínua:              27 de 29 (93,1%)
+   MLP (teste com 29 palavras, divisão 60/20/20):
+      Palavras de teste isoladas: 24 de 29 (82,8%)
+      Fala contínua:              27 de 29 (93,1%)
 
-   As figuras ficam na pasta rede/resultados/.
-   O relatório está em relatorio/relatorio_reconhecimento_de_voz.pdf.
+   RBF (teste com 14 palavras, divisão 75/15/10 pedida no enunciado):
+      Palavras de teste isoladas: 12 de 14 (85,7%)
+      Fala contínua:              13 de 14 (92,9%)
+
+   As figuras ficam em rede/resultados/ e rede_rbf/resultados/.
+   Os relatórios estão na pasta relatorio/.
 
    Ao refazer tudo no MATLAB, o resultado pode variar uma ou duas
-   palavras: o MATLAB sorteia os pesos iniciais da rede de um jeito
-   diferente do Octave, onde o projeto foi desenvolvido.
+   palavras: o MATLAB sorteia os pesos iniciais da rede (e os centros
+   iniciais da RBF) de um jeito diferente do Octave, onde o projeto foi
+   desenvolvido.

@@ -29,7 +29,8 @@ function [reconhecidas, reg] = reconhecer_palavra(x, fs, modelo, p)
     % Entradas:
     %   x      - audio (mono)
     %   fs     - taxa de amostragem (Hz)
-    %   modelo - rede e normalizacao, salvas por treinar_mlp.m
+    %   modelo - rede e normalizacao, salvas por treinar_mlp.m (ou pelo
+    %            treinar_rbf.m, com modelo.tipo = 'rbf')
     %   p      - p.janela, p.passo, p.n_conf, p.max_silencio e p.max_fora
     %            (opcional, padrao 2; 0 = abandona na primeira janela errada)
     % Saidas:
@@ -59,7 +60,11 @@ function [reconhecidas, reg] = reconhecer_palavra(x, fs, modelo, p)
                                     modelo.n_bandas, modelo.f_min, modelo.f_max);
     end
     Vn = entrada('normalizar', V, modelo.normalizacao, modelo.stats);  % mesma normalizacao do treino
-    classe = mlp('classificar', modelo.rede, Vn);
+    if isfield(modelo, 'tipo') && strcmp(modelo.tipo, 'rbf')
+        classe = rbf('classificar', modelo.rede, Vn);    % rede RBF (pasta rede_rbf)
+    else
+        classe = mlp('classificar', modelo.rede, Vn);    % rede MLP
+    end
     reg.t = ((0:nj-1)' * P + J/2) / fs;
     reg.classe = classe;
 

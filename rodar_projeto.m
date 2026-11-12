@@ -10,6 +10,9 @@ function rodar_projeto(modo)
     %   rodar_projeto('tudo')    confere e refaz tudo do zero: segmentacao,
     %                            entradas da rede, treino e programa 2,
     %                            cerca de 10 minutos
+    %   rodar_projeto('rbf')     o mesmo que o primeiro, com a rede RBF
+    %                            (rede_rbf/resultados/modelo_final.mat)
+    %   rodar_projeto('rbf_tudo') o mesmo que 'tudo', com a rede RBF
     %
     % O projeto usa so funcoes basicas do MATLAB/Octave (audioread, fft,
     % movmean, ...), sem toolbox e sem pacote extra: nao e preciso baixar
@@ -17,6 +20,8 @@ function rodar_projeto(modo)
 
     if nargin < 1, modo = 'programa2'; end
     raiz = fileparts(mfilename('fullpath'));
+    rbf  = strncmp(modo, 'rbf', 3);                       % rede RBF ou MLP
+    tudo = any(strcmp(modo, {'tudo', 'rbf_tudo'}));       % refaz tudo do zero?
 
     %% 1. Confere o ambiente
     fprintf('=== Conferindo o ambiente ===\n');
@@ -45,12 +50,14 @@ function rodar_projeto(modo)
     % Arquivos de entrada
     precisa = {fullfile('segmentacao', 'audios', 'direita.flac'), ...
                fullfile('segmentacao', 'audios', 'esquerda.flac')};
-    if ~strcmp(modo, 'tudo')
+    if ~tudo && rbf
+        precisa{end+1} = fullfile('rede_rbf', 'resultados', 'modelo_final.mat');
+    elseif ~tudo
         precisa{end+1} = fullfile('rede', 'resultados', 'modelo_final.mat');
     end
     for i = 1:numel(precisa)
         if ~exist(fullfile(raiz, precisa{i}), 'file')
-            error('Arquivo nao encontrado: %s (rode rodar_projeto(''tudo''))', precisa{i});
+            error('Arquivo nao encontrado: %s (rode com ''tudo'' ou ''rbf_tudo'')', precisa{i});
         end
     end
     fprintf('Arquivos de entrada: ok\n');
@@ -59,24 +66,34 @@ function rodar_projeto(modo)
     % As palavras, silabas e silencios cortados (segmentacao/saida) sao
     % gerados pela segmentacao. Sem eles, ela roda antes do programa 2.
     ja_cortado = exist(fullfile(raiz, 'segmentacao', 'saida', 'palavras', 'direita_001.wav'), 'file');
-    if strcmp(modo, 'tudo') || ~ja_cortado
+    if tudo || ~ja_cortado
         executar('segmentacao', 'segmentar_audios');   % palavras, silabas e silencios
     end
-    if strcmp(modo, 'tudo')
+    if tudo
         executar('rede', 'extrair_entradas');          % vetores de entrada da rede
-        executar('rede', 'treinar_mlp');               % treino e teste da rede
     end
-    executar('rede', 'programa2_reconhecer');          % reconhecimento das palavras
+    if tudo && rbf
+        executar('rede_rbf', 'treinar_rbf');           % treino e teste da RBF
+    elseif tudo
+        executar('rede', 'treinar_mlp');               % treino e teste da MLP
+    end
+    if rbf
+        executar('rede', 'programa2_reconhecer(''rbf'')');   % reconhecimento com a RBF
+        pasta_res = 'rede_rbf/resultados/';
+    else
+        executar('rede', 'programa2_reconhecer');            % reconhecimento com a MLP
+        pasta_res = 'rede/resultados/';
+    end
 
     cd(fileparts(mfilename('fullpath')));
-    fprintf('\nPronto. Resultados e figuras em rede/resultados/\n');
+    fprintf('\nPronto. Resultados e figuras em %s\n', pasta_res);
 end
 
 
 function executar(pasta, script)
     % EXECUTAR  Roda um dos scripts do projeto dentro da pasta dele (onde
     % estao as funcoes que ele usa).
-    fprintf('\n=== %s/%s.m ===\n', pasta, script);
+    fprintf('\n=== %s: %s ===\n', pasta, script);
     cd(fullfile(fileparts(mfilename('fullpath')), pasta));
     eval(script);
 end

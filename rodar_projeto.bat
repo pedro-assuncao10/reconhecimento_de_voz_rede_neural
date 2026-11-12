@@ -12,12 +12,18 @@ title Reconhecimento de DIREITA e ESQUERDA - rede neural MLP
 echo.
 echo  Reconhecimento das palavras DIREITA e ESQUERDA com rede neural MLP
 echo  ------------------------------------------------------------------
-echo   1 - rodar o programa 2 com a rede ja treinada  [cerca de 3 minutos]
-echo   2 - refazer tudo do zero: segmentacao, treino e programa 2  [cerca de 10 minutos]
+echo   Rede MLP (primeiro trabalho):
+echo     1 - rodar o programa 2 com a rede ja treinada  [cerca de 3 minutos]
+echo     2 - refazer tudo do zero: segmentacao, treino e programa 2  [cerca de 10 minutos]
+echo   Rede RBF (segundo trabalho):
+echo     3 - rodar o programa 2 com a rede ja treinada  [cerca de 3 minutos]
+echo     4 - refazer tudo do zero: segmentacao, treino e programa 2  [cerca de 10 minutos]
 echo.
-choice /c 12 /n /m "Escolha 1 ou 2: "
+choice /c 1234 /n /m "Escolha 1, 2, 3 ou 4: "
 set "COMANDO=rodar_projeto"
 if errorlevel 2 set "COMANDO=rodar_projeto('tudo')"
+if errorlevel 3 set "COMANDO=rodar_projeto('rbf')"
+if errorlevel 4 set "COMANDO=rodar_projeto('rbf_tudo')"
 
 rem ---- 1. MATLAB ------------------------------------------------------
 set "MATLAB="

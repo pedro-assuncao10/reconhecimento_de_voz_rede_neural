@@ -113,11 +113,16 @@ function [Xn, stats] = normalizar(X, tipo, stats)
     %                      para 0 a 1
     %           'zscore' : para cada coluna, subtrai a media e divide pelo
     %                      desvio padrao, calculados so no treino
-    %   stats - (so no zscore) media e desvio do treino, para usar os
-    %           mesmos valores na validacao, no teste e no programa 2
+    %           'minmax' : para cada coluna, (x - xmin) / (xmax - xmin), com o
+    %                      minimo e o maximo do treino: fica entre 0 e 1
+    %           'minmax11': o mesmo, levado para -1 a 1:
+    %                      (2x - xmax - xmin) / (xmax - xmin)
+    %   stats - (no zscore e no minmax) valores do treino, para usar os
+    %           mesmos na validacao, no teste e no programa 2
     % Saidas:
     %   Xn    - entradas normalizadas (mesmo tamanho de X)
-    %   stats - media (mu) e desvio (sigma) usados no zscore
+    %   stats - media (mu) e desvio (sigma) do zscore, ou minimo (xmin) e
+    %           maximo (xmax) do minmax
     %
     % A rede do trabalho usa 'max' (escolhida na etapa 2 dos experimentos).
 
@@ -141,6 +146,18 @@ function [Xn, stats] = normalizar(X, tipo, stats)
                 stats.sigma = std(X, 0, 1) + 1e-12;   % +1e-12 evita divisao por zero
             end
             Xn = (X - stats.mu) ./ stats.sigma;
+
+        case {'minmax', 'minmax11'}
+            if ~isfield(stats, 'xmin')                % primeira vez: calcula no treino
+                stats.xmin = min(X, [], 1);
+                stats.xmax = max(X, [], 1);
+            end
+            faixa = stats.xmax - stats.xmin + 1e-12;  % +1e-12 evita divisao por zero
+            if strcmp(tipo, 'minmax')
+                Xn = (X - stats.xmin) ./ faixa;                    % 0 a 1
+            else
+                Xn = (2 * X - stats.xmax - stats.xmin) ./ faixa;   % -1 a 1
+            end
 
         otherwise
             error('Normalizacao desconhecida: %s', tipo);

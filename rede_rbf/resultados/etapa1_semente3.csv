@@ -1,0 +1,5 @@
+etapa;faixas;contexto;normalizacao;K;centros;eta_c;largura;k;T;saida;ativ_saida;taxa;momento;epocas;semente;acerto_treino;acerto_validacao;silabas_validacao;di;rei;ta;es;quer;da;palavras_validacao;epoca;tempo_s
+1;32;nao;minmax;100;wta;0.05;unica;0.3;2;cholesky;linear;0;0;1000;3;0.8491;0.7051;0.6284;0.4459;0.6739;0.5789;0.6186;0.6500;0.8028;0.7143;0;10.8
+1;32;sim;minmax;100;wta;0.05;unica;0.3;2;cholesky;linear;0;0;1000;3;0.9200;0.7814;0.7224;0.6351;0.8152;0.5965;0.6598;0.7125;0.9155;0.7619;0;20.7
+1;64;nao;minmax;100;wta;0.05;unica;0.3;2;cholesky;linear;0;0;1000;3;0.8522;0.6847;0.6037;0.4865;0.6196;0.5088;0.5670;0.6375;0.8028;0.7619;0;10.3
+1;64;sim;minmax;100;wta;0.05;unica;0.3;2;cholesky;linear;0;0;1000;3;0.9197;0.7627;0.6994;0.5946;0.7500;0.5965;0.6804;0.6875;0.8873;0.6667;0;23.4

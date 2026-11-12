@@ -147,3 +147,80 @@ end
 xlabel('resposta da rede');  ylabel('silaba dita');
 saveas(fig, fullfile(pasta_fig, 'matriz_confusao.png'));
 close(fig);
+
+
+%% 5. Rede RBF: matriz de confusao do teste
+% (as figuras abaixo sao do relatorio da RBF)
+addpath(fullfile(pasta_rel, '..', 'rede_rbf'));
+R = load(fullfile(pasta_rel, '..', 'rede_rbf', 'resultados', 'modelo_final.mat'));
+mr = R.modelo;
+nc = numel(mr.classes);  MC = zeros(nc);
+for i = 1:numel(mr.y_teste)
+    MC(mr.y_teste(i), mr.prev_teste(i)) = MC(mr.y_teste(i), mr.prev_teste(i)) + 1;
+end
+fig = figure('Visible', 'off', 'Position', [0 0 900 760]);
+imagesc(MC ./ sum(MC, 2));  colormap(flipud(gray) * 0.85 + 0.15);  caxis([0 1]);
+set(gca, 'XTick', 1:nc, 'XTickLabel', mr.classes, 'YTick', 1:nc, 'YTickLabel', mr.classes);
+for i = 1:nc
+    for j = 1:nc
+        cor = [0 0 0];  if MC(i, j) / sum(MC(i, :)) > 0.5, cor = [1 1 1]; end
+        text(j, i, num2str(MC(i, j)), 'HorizontalAlignment', 'center', 'Color', cor, 'FontSize', 16);
+    end
+end
+xlabel('resposta da rede');  ylabel('silaba dita');
+saveas(fig, fullfile(pasta_fig, 'matriz_confusao_rbf.png'));
+close(fig);
+
+
+%% 6. Rede RBF: erro da regra delta a cada epoca, com taxas e momento diferentes
+% Mesma camada escondida da RBF escolhida (200 centros pelo WTA, raio unico
+% 0,5 dmax, db); so muda o treino dos pesos da saida (saida linear).
+Dr = rbf('dividir', load(fullfile(pasta_rel, '..', 'rede', 'entradas', 'entradas_energia_32_contexto.mat')));
+tr = Dr.conj == 1;  va = Dr.conj == 3;
+[Xtr, st] = entrada('normalizar', Dr.X(tr, :), 'db');  Xva = entrada('normalizar', Dr.X(va, :), 'db', st);
+rng(1);
+o = struct('K', 200, 'centros', 'wta', 'eta_c', 0.05, 'largura', 'unica', 'k', 0.5, 'T', 2, ...
+           'saida', 'cholesky', 'ativ_saida', 'linear', 'taxa', 0);
+rr = rbf('treinar', Xtr, Dr.y(tr), 7, o);
+Phi = rbf('ativar', rr, Xtr);  Phiva = rbf('ativar', rr, Xva);
+Y = zeros(sum(tr), 7);  Y(sub2ind(size(Y), (1:sum(tr))', Dr.y(tr))) = 1;
+Yva = zeros(sum(va), 7);  Yva(sub2ind(size(Yva), (1:sum(va))', Dr.y(va))) = 1;
+casos = {0.05, 0, 'taxa 0,05 (acima do limite): diverge'; ...
+         0.02, 0, 'taxa 0,02 (perto do limite)'; ...
+         0.005, 0, 'taxa 0,005 (abaixo do limite): lenta'; ...
+         0.005, 0.9, 'taxa 0,005 com momento 0,9'};
+cores = {[0.85 0.2 0.2], laranja, cinza * 0.6, azul};
+n_ep = 1500;
+fig = figure('Visible', 'off', 'Position', [0 0 1200 560]);
+axes('Position', [0.09 0.14 0.6 0.8]);  hold on;
+for c = 1:size(casos, 1)
+    % O erro e medido a cada lote (fracao de epoca no eixo x), para a
+    % divergencia, que acontece ja na 1a epoca, aparecer no grafico.
+    rng(1);  W = zeros(size(Phi, 2), 7);  v = zeros(size(W));
+    n_lotes = ceil(size(Phi, 1) / 32);
+    x_ep = [];  erro = [];
+    for ep = 1:n_ep
+        ordem = randperm(size(Phi, 1));
+        for b = 1:n_lotes
+            idx = ordem((b-1)*32 + 1 : min(b*32, numel(ordem)));
+            e = Y(idx, :) - Phi(idx, :) * W;
+            v = casos{c, 2} * v + casos{c, 1} * Phi(idx, :)' * e / numel(idx);
+            W = W + v;
+            if ep <= 2 || b == n_lotes                 % todo lote no comeco, depois 1 por epoca
+                x_ep(end+1) = ep - 1 + b / n_lotes;
+                erro(end+1) = mean(mean((Yva - Phiva * W).^2));
+            end
+        end
+        if ~isfinite(erro(end)) || erro(end) > 1e6, break; end   % explodiu: para
+    end
+    h(c) = plot(x_ep, min(erro, 1e3), 'Color', cores{c}, 'LineWidth', 2);
+end
+A = Phi' * Phi;  A(1:size(A,1)+1:end) = A(1:size(A,1)+1:end) + 1e-10 * mean(diag(A));
+W = rbf('cholesky', A, Phi' * Y);
+h(5) = plot([1 n_ep], [1 1] * mean(mean((Yva - Phiva * W).^2)), 'k--', 'LineWidth', 1.5);
+set(gca, 'YScale', 'log', 'Box', 'off');  ylim([0.035 10]);  xlim([1 n_ep]);
+xlabel('epoca');  ylabel('erro quadratico na validacao (escala log)');
+lg = legend(h, [casos(:, 3); {'minimo exato (cholesky)'}]);
+set(lg, 'Position', [0.71 0.45 0.27 0.3]);
+saveas(fig, fullfile(pasta_fig, 'regra_delta_rbf.png'));
+close(fig);

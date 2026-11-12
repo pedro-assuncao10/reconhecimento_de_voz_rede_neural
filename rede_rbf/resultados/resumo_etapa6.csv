@@ -1,0 +1,17 @@
+configuracao;palavras_media;palavras_desvio;silabas_media;silabas_desvio;janelas_media;di;rei;ta;es;quer;da;treino;epoca_media;tempo_medio_s;sementes
+32 faixas ctx sim | db | K=200 | WTA eta=0.05 | raio unico k=0.5 | cholesky;0.8476;0.0399;0.8269;0.0053;0.8556;0.7189;0.9261;0.9193;0.6907;0.7600;0.9465;0.9517;0;13.9;5
+32 faixas ctx sim | db | K=200 | WTA eta=0.05 | raio unico k=0.5 | delta linear taxa=0.02 momento=0.9 ate 5000 epocas;0.8190;0.0213;0.7865;0.0082;0.8288;0.6865;0.8978;0.7369;0.6639;0.7875;0.9465;0.9200;640;50.7;5
+32 faixas ctx sim | db | K=200 | WTA eta=0.05 | raio unico k=0.5 | delta sigmoide taxa=0.1 momento=0.9 ate 5000 epocas;0.8095;0.0000;0.7995;0.0040;0.8390;0.7216;0.8869;0.7614;0.7093;0.7600;0.9577;0.9158;1867;102.5;5
+32 faixas ctx sim | db | K=200 | WTA eta=0.05 | raio unico k=0.5 | delta sigmoide taxa=0.05 momento=0.9 ate 5000 epocas;0.8095;0.0000;0.7967;0.0074;0.8363;0.7351;0.8783;0.7474;0.6866;0.7750;0.9577;0.9159;2752;160.8;5
+32 faixas ctx sim | db | K=200 | WTA eta=0.05 | raio unico k=0.5 | delta linear taxa=0.01 momento=0.9 ate 5000 epocas;0.8000;0.0213;0.7892;0.0105;0.8298;0.6811;0.8957;0.7614;0.6598;0.7850;0.9521;0.9203;971;64.2;5
+32 faixas ctx sim | db | K=200 | WTA eta=0.05 | raio unico k=0.5 | delta linear taxa=0.005 momento=0.9 ate 5000 epocas;0.8000;0.0213;0.7846;0.0076;0.8271;0.6973;0.8848;0.7263;0.6598;0.7875;0.9521;0.9196;1628;93.2;5
+32 faixas ctx sim | db | K=200 | WTA eta=0.05 | raio unico k=0.5 | delta sigmoide taxa=0.02 momento=0.9 ate 5000 epocas;0.7905;0.0261;0.7749;0.0036;0.8217;0.6973;0.8739;0.6596;0.6722;0.7775;0.9690;0.9098;3195;181.5;5
+32 faixas ctx sim | db | K=200 | WTA eta=0.05 | raio unico k=0.5 | delta linear taxa=0.01;0.7905;0.0261;0.7437;0.0054;0.8024;0.6432;0.8782;0.5193;0.6722;0.7775;0.9718;0.8875;979;58.1;5
+32 faixas ctx sim | db | K=200 | WTA eta=0.05 | raio unico k=0.5 | delta linear taxa=0.002 momento=0.9 ate 5000 epocas;0.7905;0.0261;0.7750;0.0044;0.8210;0.6757;0.8870;0.6877;0.6598;0.7825;0.9577;0.9135;2676;142.4;5
+32 faixas ctx sim | db | K=200 | WTA eta=0.05 | raio unico k=0.5 | delta sigmoide taxa=0.5;0.7809;0.0261;0.7737;0.0069;0.8200;0.6946;0.8674;0.6807;0.6763;0.7600;0.9634;0.9015;981;67.9;5
+32 faixas ctx sim | db | K=200 | WTA eta=0.05 | raio unico k=0.5 | delta sigmoide taxa=0.2;0.7429;0.0261;0.7654;0.0040;0.8136;0.6622;0.8783;0.6667;0.6516;0.7650;0.9690;0.8890;980;67.7;5
+32 faixas ctx sim | db | K=200 | WTA eta=0.05 | raio unico k=0.5 | delta linear taxa=0.02;0.7429;0.0543;0.7530;0.0085;0.8071;0.6567;0.8761;0.5789;0.6557;0.7900;0.9605;0.8993;884;60.4;5
+32 faixas ctx sim | db | K=200 | WTA eta=0.05 | raio unico k=0.5 | delta linear taxa=0.005;0.7333;0.0426;0.7330;0.0057;0.7942;0.6459;0.8739;0.4912;0.6598;0.7550;0.9718;0.8730;990;48.7;5
+32 faixas ctx sim | db | K=200 | WTA eta=0.05 | raio unico k=0.5 | delta sigmoide taxa=0.1;0.7048;0.0213;0.7580;0.0061;0.8075;0.6459;0.8804;0.6632;0.6392;0.7500;0.9690;0.8728;985;65.3;5
+32 faixas ctx sim | db | K=200 | WTA eta=0.05 | raio unico k=0.5 | delta sigmoide taxa=0.05;0.6857;0.0261;0.7408;0.0068;0.7935;0.6135;0.8587;0.6491;0.6289;0.7200;0.9746;0.8533;985;66.3;5
+32 faixas ctx sim | db | K=200 | WTA eta=0.05 | raio unico k=0.5 | delta linear taxa=0.05;0.0000;0.0000;0.1334;0.0746;0.1454;0.0000;0.0000;0.0000;0.2000;0.0000;0.6000;0.1538;1;23.0;5

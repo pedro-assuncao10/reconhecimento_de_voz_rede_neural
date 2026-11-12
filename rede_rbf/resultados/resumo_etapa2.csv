@@ -1,0 +1,6 @@
+configuracao;palavras_media;palavras_desvio;silabas_media;silabas_desvio;janelas_media;di;rei;ta;es;quer;da;treino;epoca_media;tempo_medio_s;sementes
+32 faixas ctx sim | db | K=100 | WTA eta=0.05 | raio unico k=0.3 | cholesky;0.7809;0.0426;0.8255;0.0052;0.8556;0.6973;0.9195;0.9053;0.7113;0.7675;0.9521;0.9330;0;6.9;5
+32 faixas ctx sim | zscore | K=100 | WTA eta=0.05 | raio unico k=0.3 | cholesky;0.7714;0.0621;0.6934;0.0124;0.7603;0.5703;0.7978;0.5579;0.6742;0.6700;0.8901;0.9156;0;15.5;5
+32 faixas ctx sim | minmax | K=100 | WTA eta=0.05 | raio unico k=0.3 | cholesky;0.7619;0.0337;0.7236;0.0052;0.7814;0.6297;0.7891;0.6351;0.6866;0.7025;0.8986;0.9183;0;13.0;5
+32 faixas ctx sim | minmax11 | K=100 | WTA eta=0.05 | raio unico k=0.3 | cholesky;0.7619;0.0337;0.7236;0.0052;0.7814;0.6297;0.7891;0.6351;0.6866;0.7025;0.8986;0.9183;0;11.6;5
+32 faixas ctx sim | max | K=100 | WTA eta=0.05 | raio unico k=0.3 | cholesky;0.7428;0.0797;0.7373;0.0084;0.7834;0.7919;0.7913;0.7544;0.5979;0.5725;0.9155;0.8602;0;5.1;5
