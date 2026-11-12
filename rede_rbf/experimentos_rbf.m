@@ -17,7 +17,7 @@ function experimentos_rbf(acao, varargin)
     % Etapas (na ordem do algoritmo da aula):
     %   1 - entrada: sem ou com contexto, 32 ou 64 faixas
     %   2 - normalizacao: max, db, zscore, minmax [0,1] e minmax [-1,1]
-    %   3 - numero de neuronios escondidos: 25 a 400
+    %   3 - numero de neuronios escondidos: 25 a 800
     %   4 - como achar os centros: WTA com varias taxas, ou k-means
     %   5 - abertura: raio unico (varios k), metade da distancia, media dos T mais perto
     %   6 - pesos da saida: regra delta (saida linear ou sigmoide, varias
